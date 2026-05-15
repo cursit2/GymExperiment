@@ -1,0 +1,73 @@
+/* dividers.css — cosmetic room divider lines */
+
+.room-divider {
+  position: absolute;
+  top: 0;
+  height: 0;
+  width: 0;
+  border-left: 3px dashed rgba(21, 88, 100, 0.8);
+  transform: translateX(-50%) rotate(var(--divider-angle, 0deg));
+  transform-origin: center center;
+  pointer-events: auto;
+  display: block;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.room-divider.selected {
+  border-left-color: rgba(11, 54, 63, 0.95);
+}
+
+.divider-hit-area {
+  position: absolute;
+  left: -14px;
+  top: 0;
+  width: 28px;
+  height: 100%;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.divider-handle {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 2px solid #14424a;
+  background: #f2f8f8;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
+  color: #14424a;
+  font: inherit;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  pointer-events: auto;
+}
+
+.divider-move-handle {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  cursor: move;
+  display: none;
+}
+
+.room-divider.selected .divider-move-handle {
+  display: grid;
+}
+
+.divider-rotate-anchor {
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  z-index: 4;
+  display: none;
+}
+
+.divider-rotate-anchor.active {
+  display: grid;
+}
+
+.divider-rotate-anchor:active,
+.divider-move-handle:active {
+  cursor: grabbing;
+}

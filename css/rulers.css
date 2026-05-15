@@ -1,0 +1,10 @@
+/* rulers.css — metric ruler overlays along the canvas edges */
+
+.ruler {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: block;
+}

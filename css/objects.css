@@ -1,0 +1,68 @@
+/* objects.css — draggable equipment objects and their rotate handles */
+
+.room-object {
+  position: absolute;
+  z-index: 2;
+  border: 2px solid rgba(16, 24, 30, 0.65);
+  border-radius: 8px;
+  color: #132026;
+  text-shadow:
+    -1px -1px 0 #ffffff,
+    1px -1px 0 #ffffff,
+    -1px 1px 0 #ffffff,
+    1px 1px 0 #ffffff;
+  font-size: 0.86rem;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  touch-action: none;
+  cursor: move;
+  transform-origin: center;
+}
+
+.room-object.selected {
+  box-shadow: 0 0 0 3px rgba(31, 106, 116, 0.75);
+}
+
+.rotate-controls {
+  position: absolute;
+  inset: 0;
+  display: none;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.room-object.selected .rotate-controls {
+  display: block;
+}
+
+.rotate-handle {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #1b323a;
+  border-radius: 999px;
+  background: #f4fbff;
+  color: #132026;
+  font-size: 0.9rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  pointer-events: auto;
+  cursor: grab;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.rotate-handle:active {
+  cursor: grabbing;
+}
+
+.rotate-handle:hover {
+  background: #e5f0f5;
+}
+
+.rotate-handle.corner-tl { top: -16px; left:  -16px; }
+.rotate-handle.corner-tr { top: -16px; right: -16px; }
+.rotate-handle.corner-bl { bottom: -16px; left:  -16px; }
+.rotate-handle.corner-br { bottom: -16px; right: -16px; }

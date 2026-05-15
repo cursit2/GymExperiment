@@ -1,0 +1,194 @@
+:root {
+  --bg: #f2efe8;
+  --panel: #e4dccf;
+  --ink: #1f2a30;
+  --accent: #1f6a74;
+  --accent-2: #8e5d2f;
+  --danger: #8a2a2a;
+  --room-border: #3b4c56;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 20% 0%, #fff7df 0%, transparent 35%),
+    radial-gradient(circle at 90% 10%, #d8ebe7 0%, transparent 40%),
+    var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+.app-header {
+  padding: 1rem 1.25rem 0.5rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+
+.app-header p {
+  margin: 0.35rem 0 0;
+  max-width: 72ch;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 270px 1fr;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.5rem;
+}
+
+.palette {
+  background: color-mix(in srgb, var(--panel) 85%, white);
+  border: 2px solid color-mix(in srgb, var(--accent-2) 45%, black);
+  border-radius: 14px;
+  padding: 0.9rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.palette h2 {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.palette-item,
+.controls button {
+  border: 1px solid #24343b;
+  border-radius: 10px;
+  padding: 0.55rem 0.6rem;
+  background: #f7f4ea;
+  color: var(--ink);
+  font-size: 0.95rem;
+  cursor: grab;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.palette-item:active {
+  cursor: grabbing;
+}
+
+.palette-item:hover,
+.controls button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+.controls {
+  margin-top: 1.2rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.controls label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.controls select {
+  border: 1px solid #24343b;
+  border-radius: 10px;
+  padding: 0.55rem 0.6rem;
+  background: #f1f5f7;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.controls input[type="range"] {
+  width: 100%;
+}
+
+.controls button {
+  cursor: pointer;
+  background: #f1f5f7;
+}
+
+.controls .danger {
+  border-color: #5f1f1f;
+  color: #fff;
+  background: var(--danger);
+}
+
+.canvas-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.canvas-hint {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.room-canvas {
+  --bg-zoom: 1;
+  --bg-pan-x: 0px;
+  --bg-pan-y: 0px;
+  position: relative;
+  width: 100%;
+  height: min(78vh, 760px);
+  min-height: 420px;
+  border: 3px solid var(--room-border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #cad8d4;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.scene-layer {
+  position: absolute;
+  /* centers the scene origin at canvas center so zoom feels natural */
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(var(--bg-pan-x), var(--bg-pan-y)) scale(var(--bg-zoom));
+  transform-origin: 0 0;
+  z-index: 1;
+}
+
+.room-background-img {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  z-index: 0;
+  /* sized and centered by JS */
+}
+
+.room-canvas.bg-move-mode {
+  cursor: grab;
+}
+
+.room-canvas.bg-moving {
+  cursor: grabbing;
+}
+
+.room-canvas.drag-over {
+  outline: 3px dashed var(--accent);
+  outline-offset: -8px;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .palette {
+    order: 2;
+  }
+
+  .room-canvas {
+    height: min(58vh, 640px);
+    min-height: 360px;
+  }
+}

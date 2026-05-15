@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="4000cm" height="7000cm" viewBox="0 0 4000 7000">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6efe2" />
+      <stop offset="1" stop-color="#ebdfc9" />
+    </linearGradient>
+    <pattern id="wood" width="120" height="120" patternUnits="userSpaceOnUse">
+      <rect width="120" height="120" fill="none" />
+      <path d="M0 0 H120 M0 60 H120 M60 0 V120" stroke="#c9b693" stroke-width="2" opacity="0.35" />
+    </pattern>
+  </defs>
+
+  <rect x="0" y="0" width="4000" height="7000" fill="#6e7f87" />
+  <rect x="120" y="120" width="3760" height="6760" rx="40" fill="url(#base)" />
+  <rect x="120" y="120" width="3760" height="6760" rx="40" fill="url(#wood)" />
+
+  <rect x="120" y="120" width="3760" height="6760" rx="40" fill="none" stroke="#354750" stroke-width="20" />
+
+  <g opacity="0.2" stroke="#355563" stroke-width="10" fill="none">
+    <rect x="420" y="520" width="3160" height="2500" />
+    <line x1="2000" y1="520" x2="2000" y2="3020" />
+    <circle cx="2000" cy="1770" r="180" />
+    <rect x="420" y="1380" width="580" height="780" />
+    <rect x="3000" y="1380" width="580" height="780" />
+    <circle cx="1000" cy="1770" r="180" />
+    <circle cx="3000" cy="1770" r="180" />
+    <path d="M1540 1220 A780 780 0 0 0 1540 2320" />
+    <path d="M2460 1220 A780 780 0 0 1 2460 2320" />
+    <path d="M700 700 A1120 1120 0 0 1 700 2840" />
+    <path d="M3300 700 A1120 1120 0 0 0 3300 2840" />
+    <line x1="700" y1="900" x2="700" y2="2640" />
+    <line x1="3300" y1="900" x2="3300" y2="2640" />
+    <circle cx="760" cy="1770" r="28" fill="#355563" />
+    <circle cx="3240" cy="1770" r="28" fill="#355563" />
+
+    <rect x="420" y="3980" width="3160" height="2500" />
+    <line x1="2000" y1="3980" x2="2000" y2="6480" />
+    <circle cx="2000" cy="5230" r="180" />
+    <rect x="420" y="4840" width="580" height="780" />
+    <rect x="3000" y="4840" width="580" height="780" />
+    <circle cx="1000" cy="5230" r="180" />
+    <circle cx="3000" cy="5230" r="180" />
+    <path d="M1540 4680 A780 780 0 0 0 1540 5780" />
+    <path d="M2460 4680 A780 780 0 0 1 2460 5780" />
+    <path d="M700 4160 A1120 1120 0 0 1 700 6300" />
+    <path d="M3300 4160 A1120 1120 0 0 0 3300 6300" />
+    <line x1="700" y1="4360" x2="700" y2="6100" />
+    <line x1="3300" y1="4360" x2="3300" y2="6100" />
+    <circle cx="760" cy="5230" r="28" fill="#355563" />
+    <circle cx="3240" cy="5230" r="28" fill="#355563" />
+  </g>
+</svg>

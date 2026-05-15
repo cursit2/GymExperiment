@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Room Planner</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/dividers.css" />
+    <link rel="stylesheet" href="css/objects.css" />
+    <link rel="stylesheet" href="css/rulers.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Room Planner</h1>
+      <p>Drag gymnastics equipment from the left panel into the room. Click an object to move, rotate, or delete it.</p>
+    </header>
+
+    <main class="layout">
+      <div class="left-sidebar">
+        <div class="sidebar-tabs" role="tablist" aria-label="Sidebar sections">
+          <button id="equipmentTabBtn" class="sidebar-tab active" type="button" role="tab" aria-selected="true" aria-controls="equipmentTabPanel" data-active="true">Equipment</button>
+          <button id="actionsTabBtn" class="sidebar-tab" type="button" role="tab" aria-selected="false" aria-controls="actionsTabPanel" data-active="false">Actions</button>
+          <button id="mapTabBtn" class="sidebar-tab" type="button" role="tab" aria-selected="false" aria-controls="mapTabPanel" data-active="false">Map</button>
+        </div>
+
+      <aside class="palette" aria-label="Object palette">
+
+        <section id="equipmentTabPanel" class="sidebar-panel active" role="tabpanel" aria-labelledby="equipmentTabBtn">
+          <h2>Equipment</h2>
+          <div class="palette-grid" id="palette">
+            <button class="palette-item" draggable="true" data-type="bars">Bars</button>
+            <button class="palette-item" draggable="true" data-type="beam">Beam</button>
+            <button class="palette-item" draggable="true" data-type="boxVault">Box Vault</button>
+            <button class="palette-item" draggable="true" data-type="floor">Floor</button>
+            <button class="palette-item" draggable="true" data-type="springboard">Springboard</button>
+            <button class="palette-item" draggable="true" data-type="vault">Vault</button>
+            <button class="palette-item" draggable="true" data-type="mat">Mat</button>
+          </div>
+          <section class="controls" aria-label="Equipment controls">
+            <button id="addEquipmentBtn" type="button">Add Equipment Item</button>
+          </section>
+
+          <section id="customEquipmentEditor" class="controls custom-equipment-editor" aria-label="Custom equipment editor" hidden>
+            <h2>Custom Equipment</h2>
+            <label for="customEquipmentSelect">Item</label>
+            <select id="customEquipmentSelect"></select>
+
+            <label for="customEquipmentNameInput">Name</label>
+            <input id="customEquipmentNameInput" type="text" maxlength="60" />
+
+            <label for="customEquipmentLengthInput">Length (cm)</label>
+            <input id="customEquipmentLengthInput" type="number" min="10" max="10000" step="1" />
+
+            <label for="customEquipmentWidthInput">Width (cm)</label>
+            <input id="customEquipmentWidthInput" type="number" min="10" max="10000" step="1" />
+
+            <label for="customEquipmentColorInput">Color</label>
+            <input id="customEquipmentColorInput" type="color" />
+
+            <button id="deleteCustomEquipmentBtn" type="button" class="danger">Delete Custom Equipment</button>
+          </section>
+        </section>
+
+        <section id="actionsTabPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="actionsTabBtn" hidden>
+          <section class="controls" aria-label="Scene controls">
+            <h2>Actions</h2>
+            <button id="dividerBtn" type="button">Add Divider</button>
+            <button id="deleteBtn" type="button">Delete Selected</button>
+            <button id="undoBtn" type="button">Undo (Ctrl+Z)</button>
+            <button id="savePlannerBtn" type="button">Save Planner</button>
+            <button id="loadPlannerBtn" type="button">Load Planner</button>
+            <input id="plannerFileInput" type="file" accept="application/json" hidden />
+            <button id="clearBtn" type="button" class="danger">Clear Room</button>
+          </section>
+        </section>
+
+        <section id="mapTabPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="mapTabBtn" hidden>
+          <section class="controls" aria-label="Map controls">
+            <h2>Map</h2>
+            <label for="backgroundSelect">Background</label>
+            <select id="backgroundSelect" aria-label="Choose floor background">
+              <option value="assets/room-topdown.svg" selected>Room</option>
+              <option value="assets/gym-floor-topdown-4000x7000cm.svg">Gym Floor (2 Courts)</option>
+            </select>
+            <label for="backgroundZoom">Background Zoom <span id="backgroundZoomValue">100%</span></label>
+            <input id="backgroundZoom" type="range" min="5" max="300" value="100" step="1" aria-label="Zoom background" />
+            <button id="resetBackgroundBtn" type="button">Reset Background View</button>
+            <button id="newMapBtn" type="button">New Map</button>
+            <button id="importGoogleMapBtn" type="button">Import Google Map</button>
+          </section>
+
+          <section id="customMapEditor" class="controls custom-map-editor" aria-label="Custom map editor" hidden>
+            <h2>Custom Map</h2>
+            <label for="customMapNameInput">Name</label>
+            <input id="customMapNameInput" type="text" maxlength="60" />
+
+            <label for="customMapWidthInput">Width (cm)</label>
+            <input id="customMapWidthInput" type="number" min="1" step="1" />
+
+            <label for="customMapHeightInput">Height (cm)</label>
+            <input id="customMapHeightInput" type="number" min="1" step="1" />
+
+            <label for="customMapColorSelect">Color</label>
+            <select id="customMapColorSelect">
+              <option value="Beige">Beige</option>
+              <option value="Gray">Gray</option>
+              <option value="Blue">Blue</option>
+              <option value="Green">Green</option>
+              <option value="Tan">Tan</option>
+              <option value="White">White</option>
+            </select>
+
+            <div class="custom-map-area-actions">
+              <button id="customMapDrawAreaBtn" type="button">Draw Yellow Area</button>
+              <button id="customMapClearAreaBtn" type="button">Remove Yellow Area</button>
+            </div>
+
+            <button id="deleteCustomMapBtn" type="button" class="danger">Delete Custom Map</button>
+          </section>
+        </section>
+      </aside>
+      </div>
+
+      <section class="canvas-wrap" aria-label="Room editor">
+        <div class="canvas-hint" id="hint">Drop objects inside the room</div>
+        <div id="roomCanvas" class="room-canvas" role="application" aria-label="Top-down room canvas"></div>
+      </section>
+    </main>
+
+    <dialog id="newMapDialog" class="new-map-dialog" aria-labelledby="newMapDialogTitle">
+      <form id="newMapForm" class="new-map-form" novalidate>
+        <h2 id="newMapDialogTitle">Create New Map</h2>
+        <label for="newMapNameInput">Map Name</label>
+        <input id="newMapNameInput" type="text" maxlength="60" placeholder="My Training Room" required />
+
+        <label for="newMapWidthInput">Width (cm)</label>
+        <input id="newMapWidthInput" type="number" min="1" step="1" required />
+
+        <label for="newMapHeightInput">Height (cm)</label>
+        <input id="newMapHeightInput" type="number" min="1" step="1" required />
+
+        <label for="newMapColorSelect">Color</label>
+        <select id="newMapColorSelect">
+          <option value="Beige">Beige</option>
+          <option value="Gray">Gray</option>
+          <option value="Blue">Blue</option>
+          <option value="Green">Green</option>
+          <option value="Tan">Tan</option>
+          <option value="White">White</option>
+        </select>
+
+        <div class="new-map-actions">
+          <button id="newMapCancelBtn" type="button">Cancel</button>
+          <button id="newMapCreateBtn" type="submit">Create Map</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="newEquipmentDialog" class="new-map-dialog" aria-labelledby="newEquipmentDialogTitle">
+      <form id="newEquipmentForm" class="new-map-form" novalidate>
+        <h2 id="newEquipmentDialogTitle">Add Equipment Item</h2>
+        <label for="newEquipmentNameInput">Name</label>
+        <input id="newEquipmentNameInput" type="text" maxlength="60" placeholder="Custom Beam" required />
+
+        <label for="newEquipmentLengthInput">Length (cm)</label>
+        <input id="newEquipmentLengthInput" type="number" min="10" max="10000" step="1" required />
+
+        <label for="newEquipmentWidthInput">Width (cm)</label>
+        <input id="newEquipmentWidthInput" type="number" min="10" max="10000" step="1" required />
+
+        <label for="newEquipmentColorInput">Color</label>
+        <input id="newEquipmentColorInput" type="color" value="#8ec2a2" />
+
+        <div class="new-map-actions">
+          <button id="newEquipmentCancelBtn" type="button">Cancel</button>
+          <button id="newEquipmentCreateBtn" type="submit">Add Item</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="importGoogleMapDialog" class="new-map-dialog import-map-dialog" aria-labelledby="importGoogleMapDialogTitle">
+      <form id="importGoogleMapForm" class="new-map-form" novalidate>
+        <h2 id="importGoogleMapDialogTitle">Import Google Map Satellite Image</h2>
+
+        <label for="googleMapLinkInput">Google Maps Link</label>
+        <input id="googleMapLinkInput" type="text" placeholder="https://maps.google.com/..." />
+
+        <div id="googleMapPreviewWrap" class="import-map-preview" hidden>
+            <div id="googleMapPreviewMap" class="import-map-preview-map" aria-label="Google map preview"></div>
+        </div>
+
+        <p id="googleMapScaleInfo" class="import-map-info">Paste a Google Maps link to load the satellite image.</p>
+        <p id="googleMapSizeWarning" class="import-map-warning" hidden></p>
+        <p id="googleMapDialogMessage" class="dialog-message" hidden aria-live="polite"></p>
+        <input id="googleMapImageFileInput" type="file" accept="image/*" hidden />
+
+        <div class="import-map-file-row">
+          <button id="importGoogleMapFileBtn" type="button">Import File</button>
+          <p id="googleMapFileNameInfo" class="import-map-file-name">No file selected.</p>
+        </div>
+
+        <div id="googleMapCropWrap" class="import-map-crop" hidden>
+          <canvas id="googleMapCropCanvas" class="import-map-canvas" width="560" height="320" aria-label="Image crop preview"></canvas>
+          <div class="import-map-crop-actions">
+            <p id="googleMapCropInfo" class="import-map-file-name">Drag on the image to crop. Map dimensions update automatically.</p>
+            <button id="googleMapResetCropBtn" type="button">Reset Crop</button>
+          </div>
+        </div>
+
+        <label for="googleMapNameInput">Map Name</label>
+        <input id="googleMapNameInput" type="text" maxlength="60" placeholder="Imported Satellite Map" required />
+
+        <div class="new-map-actions">
+          <button id="importGoogleMapCancelBtn" type="button">Cancel</button>
+          <button id="importGoogleMapCreateBtn" type="submit">Create Map</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="js/objects.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/background.js"></script>
+    <script src="js/rulers.js"></script>
+    <script src="js/dividers.js"></script>
+    <script src="js/room-objects.js"></script>
+    <script src="js/persistence.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

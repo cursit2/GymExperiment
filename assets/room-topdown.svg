@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <defs>
+    <linearGradient id="floor" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e8dcc8"/>
+      <stop offset="1" stop-color="#d9c7ac"/>
+    </linearGradient>
+    <pattern id="tile" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#bda989" stroke-width="1" opacity="0.45"/>
+    </pattern>
+  </defs>
+
+  <rect x="0" y="0" width="1400" height="900" fill="#61737d"/>
+  <rect x="46" y="46" width="1308" height="808" rx="18" fill="url(#floor)"/>
+  <rect x="46" y="46" width="1308" height="808" rx="18" fill="url(#tile)"/>
+
+  <rect x="550" y="46" width="300" height="26" fill="#9eb7c3"/>
+  <text x="700" y="64" font-family="Verdana" font-size="18" fill="#33434b" text-anchor="middle">Window</text>
+
+  <rect x="46" y="320" width="24" height="260" fill="#9b845e"/>
+  <path d="M70,450 A128,128 0 0 1 198,322" fill="none" stroke="#9b845e" stroke-width="4"/>
+
+  <text x="92" y="460" font-family="Verdana" font-size="16" fill="#33434b">Door</text>
+
+  <rect x="1100" y="680" width="200" height="130" rx="10" fill="#c8d9de" opacity="0.55"/>
+  <text x="1200" y="748" font-family="Verdana" font-size="20" fill="#3f4f56" text-anchor="middle">Rug Zone</text>
+</svg>
