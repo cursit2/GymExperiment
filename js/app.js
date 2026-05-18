@@ -469,20 +469,24 @@ document.addEventListener("keydown", (event) => {
 });
 
 
-try {
-  const restored = loadPlannerFromLocalStorage();
-  syncCustomEquipmentEditor();
-  if (!restored) {
+// Try server save first (shared persistent storage), fall back to localStorage.
+(async () => {
+  try {
+    let restored = await loadPlannerFromServer();
+    if (!restored) restored = loadPlannerFromLocalStorage();
+    syncCustomEquipmentEditor();
+    if (!restored) {
+      applyBackground(backgroundSelect.value);
+      backgroundState.zoom = getFitZoom();
+      renderBackgroundView();
+    }
+  } catch (error) {
+    console.error(error);
     applyBackground(backgroundSelect.value);
     backgroundState.zoom = getFitZoom();
     renderBackgroundView();
   }
-} catch (error) {
-  console.error(error);
-  applyBackground(backgroundSelect.value);
-  backgroundState.zoom = getFitZoom();
-  renderBackgroundView();
-}
 
-activateSidebarTab("equipment");
-startPlannerAutosave();
+  activateSidebarTab("equipment");
+  startPlannerAutosave();
+})();

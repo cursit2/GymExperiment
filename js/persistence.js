@@ -157,6 +157,33 @@ function savePlannerToLocalStorage() {
   localStorage.setItem(PLANNER_LOCAL_STORAGE_KEY, payload);
 }
 
+async function savePlannerToServer(name = 'autosave') {
+  try {
+    const payload = JSON.stringify(serializePlannerState());
+    await fetch(`/api/saves/${encodeURIComponent(name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+  } catch {
+    // Server not available (e.g. opened directly as a file) — ignore silently.
+  }
+}
+
+async function loadPlannerFromServer(name = 'autosave') {
+  try {
+    const res = await fetch(`/api/saves/${encodeURIComponent(name)}`);
+    if (!res.ok) return false;
+    const parsed = await res.json();
+    applyPlannerState(parsed);
+    clearUndoStack();
+    setHint('Planner restored from server save.');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function loadPlannerFromLocalStorage() {
   const raw = localStorage.getItem(PLANNER_LOCAL_STORAGE_KEY);
   if (!raw) return false;
@@ -192,10 +219,16 @@ async function loadPlannerFromFile(file) {
 
 function startPlannerAutosave() {
   let lastSnapshot = "";
+  let serverSaveTimer = null;
+
   setInterval(() => {
     const snapshot = JSON.stringify(serializePlannerState());
     if (snapshot === lastSnapshot) return;
     localStorage.setItem(PLANNER_LOCAL_STORAGE_KEY, snapshot);
     lastSnapshot = snapshot;
+
+    // Debounce server save: write to disk 3 s after the last change.
+    clearTimeout(serverSaveTimer);
+    serverSaveTimer = setTimeout(() => savePlannerToServer(), 3000);
   }, 800);
 }

@@ -41,27 +41,35 @@ function Get-LanUrls {
     return @("http://localhost:$RulePort")
   }
 
-  return $ips | ForEach-Object { "http://$_:$RulePort" }
+  return $ips | ForEach-Object { "http://${_}:$RulePort" }
 }
 
 function Start-HttpServer {
   param([int]$RulePort)
 
-  $python = Get-Command py -ErrorAction SilentlyContinue
-  if ($python) {
-    Write-Host "Starting Python server on port $RulePort..."
-    py -m http.server $RulePort --bind 0.0.0.0
+  $node = Get-Command node -ErrorAction SilentlyContinue
+  if ($node) {
+    Write-Host "Starting GymPlanner server on port $RulePort..."
+    $env:PORT = $RulePort
+    node server.js
     return
   }
 
   $npx = Get-Command npx -ErrorAction SilentlyContinue
   if ($npx) {
-    Write-Host "Starting Node serve on port $RulePort..."
+    Write-Host "Starting Node serve on port $RulePort (no persistent saves)..."
     npx serve -l $RulePort .
     return
   }
 
-  throw "Neither 'py' nor 'npx' was found. Install Python or Node.js first."
+  $python = Get-Command py -ErrorAction SilentlyContinue
+  if ($python) {
+    Write-Host "Starting Python server on port $RulePort (no persistent saves)..."
+    py -m http.server $RulePort --bind 0.0.0.0 --directory .
+    return
+  }
+
+  throw "Neither 'node', 'npx' nor 'py' was found. Install Node.js or Python first."
 }
 
 Write-Host "Ensuring firewall rule for LAN access..."
@@ -73,5 +81,8 @@ Get-LanUrls -RulePort $Port | ForEach-Object { Write-Host "  $_" }
 Write-Host ""
 Write-Host "Press Ctrl+C to stop the server."
 Write-Host ""
+
+# Change to project root directory (parent of scripts folder)
+Set-Location (Split-Path -Parent $PSScriptRoot)
 
 Start-HttpServer -RulePort $Port

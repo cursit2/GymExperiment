@@ -26,7 +26,6 @@
       <aside class="palette" aria-label="Object palette">
 
         <section id="equipmentTabPanel" class="sidebar-panel active" role="tabpanel" aria-labelledby="equipmentTabBtn">
-          <h2>Equipment</h2>
           <div class="palette-grid" id="palette">
             <button class="palette-item" draggable="true" data-type="bars">Bars</button>
             <button class="palette-item" draggable="true" data-type="beam">Beam</button>
@@ -63,7 +62,6 @@
 
         <section id="actionsTabPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="actionsTabBtn" hidden>
           <section class="controls" aria-label="Scene controls">
-            <h2>Actions</h2>
             <button id="dividerBtn" type="button">Add Divider</button>
             <button id="deleteBtn" type="button">Delete Selected</button>
             <button id="undoBtn" type="button">Undo (Ctrl+Z)</button>
@@ -76,11 +74,9 @@
 
         <section id="mapTabPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="mapTabBtn" hidden>
           <section class="controls" aria-label="Map controls">
-            <h2>Map</h2>
             <label for="backgroundSelect">Background</label>
             <select id="backgroundSelect" aria-label="Choose floor background">
-              <option value="assets/room-topdown.svg" selected>Room</option>
-              <option value="assets/gym-floor-topdown-4000x7000cm.svg">Gym Floor (2 Courts)</option>
+              <option value="assets/gym-floor-topdown-4000x7000cm.svg" selected>Gym Floor (2 Courts)</option>
             </select>
             <label for="backgroundZoom">Background Zoom <span id="backgroundZoomValue">100%</span></label>
             <input id="backgroundZoom" type="range" min="5" max="300" value="100" step="1" aria-label="Zoom background" />
