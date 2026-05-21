@@ -9,8 +9,6 @@ const deleteBtn       = document.getElementById("deleteBtn");
 const clearBtn        = document.getElementById("clearBtn");
 const undoBtn         = document.getElementById("undoBtn");
 const savePlannerBtn  = document.getElementById("savePlannerBtn");
-const loadPlannerBtn  = document.getElementById("loadPlannerBtn");
-const plannerFileInput = document.getElementById("plannerFileInput");
 const addEquipmentBtn = document.getElementById("addEquipmentBtn");
 const equipmentTabBtn = document.getElementById("equipmentTabBtn");
 const actionsTabBtn = document.getElementById("actionsTabBtn");
@@ -20,6 +18,61 @@ const actionsTabPanel = document.getElementById("actionsTabPanel");
 const mapTabPanel = document.getElementById("mapTabPanel");
 const newEquipmentDialog = document.getElementById("newEquipmentDialog");
 const newEquipmentForm = document.getElementById("newEquipmentForm");
+const SAVED_MAP_OPTION_PREFIX = "save:";
+
+async function refreshSavedMapOptions() {
+  const existingSavedOptions = [...backgroundSelect.options].filter((option) => (
+    option.dataset.savedMap === "true"
+    || String(option.value || "").startsWith(SAVED_MAP_OPTION_PREFIX)
+  ));
+  existingSavedOptions.forEach((opt) => opt.remove());
+
+  try {
+    const res = await fetch("/api/saved-maps");
+    if (!res.ok) return;
+    const savedMaps = await res.json();
+    if (!Array.isArray(savedMaps)) return;
+
+    const normalizeLabel = (value) => String(value || "").trim().toLowerCase();
+    const existingOptionLabels = [...backgroundSelect.options]
+      .map((option) => normalizeLabel(option.textContent))
+      .filter(Boolean);
+    const existingLabels = new Set(existingOptionLabels);
+    const existingSources = new Set(
+      [...backgroundSelect.options]
+        .filter((option) => option.dataset.savedMap !== "true")
+        .map((option) => String(option.value || "").trim())
+        .filter(Boolean),
+    );
+
+    savedMaps.forEach((item) => {
+      const saveName = String(item?.saveName || "").trim();
+      if (!saveName) return;
+      const src = String(item?.src || "").trim();
+      if (src && src !== CUSTOM_BACKGROUND_KEY && existingSources.has(src)) return;
+      const label = String(item?.label || saveName).trim();
+      const normalizedLabel = normalizeLabel(label);
+      const collidesWithExisting = existingOptionLabels.some((existing) => (
+        existing === normalizedLabel
+        || existing.startsWith(`${normalizedLabel} (`)
+      ));
+      if (collidesWithExisting || existingLabels.has(normalizedLabel)) return;
+
+      const option = document.createElement("option");
+      option.value = `${SAVED_MAP_OPTION_PREFIX}${saveName}`;
+      option.textContent = label;
+      option.dataset.savedMap = "true";
+      option.dataset.fullLabel = option.textContent;
+      backgroundSelect.appendChild(option);
+      existingLabels.add(normalizedLabel);
+    });
+
+    syncBackgroundSelectTitle();
+  } catch {
+    // Keep normal background options when saved-map list is unavailable.
+  }
+}
+window.refreshSavedMapOptions = refreshSavedMapOptions;
 const newEquipmentNameInput = document.getElementById("newEquipmentNameInput");
 const newEquipmentLengthInput = document.getElementById("newEquipmentLengthInput");
 const newEquipmentWidthInput = document.getElementById("newEquipmentWidthInput");
@@ -134,7 +187,7 @@ palette.addEventListener("dragstart", (event) => {
   if (!item) return;
   event.dataTransfer.effectAllowed = "copy";
   event.dataTransfer.setData("text/object-type", item.dataset.type);
-  setHint(`Dragging ${item.textContent}. Drop it in the room.`);
+  setHint(t("hint.dragging", { item: item.textContent }));
 });
 
 roomCanvas.addEventListener("dragover", (event) => {
@@ -225,7 +278,7 @@ backgroundZoom.addEventListener("input", () => {
 
 resetBackgroundBtn.addEventListener("click", () => {
   resetBackgroundView();
-  setHint("Background view reset.");
+  setHint(t("hint.backgroundViewReset"));
 });
 
 newMapBtn.addEventListener("click", () => {
@@ -240,7 +293,7 @@ importGoogleMapBtn.addEventListener("click", () => {
 
 addEquipmentBtn.addEventListener("click", () => {
   if (!newEquipmentDialog || !newEquipmentForm) {
-    setHint("Equipment dialog is unavailable.");
+    setHint(t("hint.equipmentDialogUnavailable"));
     return;
   }
 
@@ -271,10 +324,10 @@ addEquipmentBtn.addEventListener("click", () => {
       });
       syncCustomEquipmentEditor(key);
       savePlannerToLocalStorage();
-      setHint(`Added equipment: ${window.objectCatalog[key].label}. Drag it from Equipment.`);
+      setHint(t("hint.addedEquipment", { name: window.objectCatalog[key].label }));
       closeDialog();
     } catch (error) {
-      setHint(error?.message || "Unable to add equipment item.");
+      setHint(error?.message || t("hint.unableAddEquipment"));
     }
   };
 
@@ -313,9 +366,9 @@ const handleCustomEquipmentEdit = () => {
     refreshPlacedObjectsForType(key);
     syncCustomEquipmentEditor(key);
     savePlannerToLocalStorage();
-    setHint("Custom equipment updated.");
+    setHint(t("hint.customEquipmentUpdated"));
   } catch (error) {
-    setHint(error?.message || "Unable to update custom equipment.");
+    setHint(error?.message || t("hint.unableUpdateCustomEquipment"));
     syncCustomEquipmentEditor(key);
   }
 };
@@ -328,14 +381,14 @@ customEquipmentColorEditorInput?.addEventListener("change", handleCustomEquipmen
 deleteCustomEquipmentBtn?.addEventListener("click", () => {
   const key = customEquipmentSelect?.value;
   if (!key) {
-    setHint("Select a custom equipment item to delete.");
+    setHint(t("hint.selectCustomEquipmentDelete"));
     return;
   }
 
-  const customName = window.objectCatalog[key]?.label || "this custom equipment item";
-  const confirmed = window.confirm(`Delete ${customName}? This cannot be undone.`);
+  const customName = window.objectCatalog[key]?.label || t("label.item");
+  const confirmed = window.confirm(t("confirm.deleteCustomEquipment", { name: customName }));
   if (!confirmed) {
-    setHint("Custom equipment delete canceled.");
+    setHint(t("hint.customEquipmentDeleteCanceled"));
     return;
   }
 
@@ -348,13 +401,13 @@ deleteCustomEquipmentBtn?.addEventListener("click", () => {
     deleteCustomEquipmentItem(key);
     syncCustomEquipmentEditor();
     savePlannerToLocalStorage();
-    setHint("Custom equipment deleted.");
+    setHint(t("hint.customEquipmentDeleted"));
   } catch (error) {
-    setHint(error?.message || "Unable to delete custom equipment.");
+    setHint(error?.message || t("hint.unableDeleteCustomEquipment"));
   }
 });
 
-dividerBtn.addEventListener("click", () => {
+dividerBtn?.addEventListener("click", () => {
   addDivider();
 });
 
@@ -366,18 +419,18 @@ deleteBtn.addEventListener("click", () => {
     pushUndo(() => {
       sceneEl.appendChild(obj);
       selectObject(savedId);
-      setHint("Undo: object restored.");
+      setHint(t("hint.undoObjectRestored"));
     });
     obj.remove();
-    setHint("Object removed.");
+    setHint(t("hint.objectRemoved"));
     selectedId = null;
     return;
   }
   if (removeSelectedDivider()) {
-    setHint("Divider removed.");
+    setHint(t("hint.dividerRemoved"));
     return;
   }
-  setHint("Select an object or divider to delete.");
+  setHint(t("hint.selectObjectOrDividerDelete"));
 });
 
 clearBtn.addEventListener("click", () => {
@@ -394,7 +447,7 @@ clearBtn.addEventListener("click", () => {
     });
     selectedId        = null;
     selectedDividerId = null;
-    setHint("Undo: room restored.");
+    setHint(t("hint.undoRoomRestored"));
   });
   savedObjects.forEach((obj) => obj.remove());
   dividers.splice(0).forEach((d) => {
@@ -404,7 +457,7 @@ clearBtn.addEventListener("click", () => {
   });
   selectedId        = null;
   selectedDividerId = null;
-  setHint("Room cleared.");
+  setHint(t("hint.roomCleared"));
 });
 
 // ---------------------------------------------------------------------------
@@ -418,15 +471,28 @@ window.addEventListener("resize", () => {
 // ---------------------------------------------------------------------------
 // Background selector
 
-backgroundSelect.addEventListener("change", () => {
-  applyBackground(backgroundSelect.value);
+backgroundSelect.addEventListener("change", async () => {
+  const newSrc = backgroundSelect.value;
+
+  if (newSrc.startsWith(SAVED_MAP_OPTION_PREFIX)) {
+    const saveName = newSrc.slice(SAVED_MAP_OPTION_PREFIX.length);
+    const restored = await loadPlannerFromServer(saveName);
+    if (restored) {
+      syncCustomMapEditor();
+      await refreshSavedMapOptions();
+    }
+    return;
+  }
+
+  switchMapObjects(newSrc);
+  applyBackground(newSrc);
   backgroundState.zoom = getFitZoom();
   backgroundState.panX = 0;
   backgroundState.panY = 0;
   clampBackgroundPan();
   renderBackgroundView();
   syncCustomMapEditor();
-  setHint("Background updated.");
+  setHint(t("hint.backgroundUpdated"));
 });
 
 // ---------------------------------------------------------------------------
@@ -436,25 +502,10 @@ backgroundSelect.addEventListener("change", () => {
 
 undoBtn.addEventListener("click", () => performUndo());
 
-savePlannerBtn.addEventListener("click", () => {
-  savePlannerToFile();
-});
-
-loadPlannerBtn.addEventListener("click", () => {
-  plannerFileInput.value = "";
-  plannerFileInput.click();
-});
-
-plannerFileInput.addEventListener("change", async () => {
-  const [file] = plannerFileInput.files || [];
-  if (!file) return;
-  try {
-    await loadPlannerFromFile(file);
-    syncCustomEquipmentEditor();
-  } catch (error) {
-    console.error(error);
-    setHint("Unable to load planner file.");
-  }
+savePlannerBtn.addEventListener("click", async () => {
+  savePlannerToLocalStorage();
+  await savePlannerToServer(undefined, { silent: false });
+  await refreshSavedMapOptions();
 });
 
 document.addEventListener("keydown", (event) => {
@@ -475,6 +526,7 @@ document.addEventListener("keydown", (event) => {
     let restored = await loadPlannerFromServer();
     if (!restored) restored = loadPlannerFromLocalStorage();
     syncCustomEquipmentEditor();
+    await refreshSavedMapOptions();
     if (!restored) {
       applyBackground(backgroundSelect.value);
       backgroundState.zoom = getFitZoom();
@@ -482,6 +534,7 @@ document.addEventListener("keydown", (event) => {
     }
   } catch (error) {
     console.error(error);
+    await refreshSavedMapOptions();
     applyBackground(backgroundSelect.value);
     backgroundState.zoom = getFitZoom();
     renderBackgroundView();

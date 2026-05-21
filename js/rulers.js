@@ -35,8 +35,10 @@ function renderRulers() {
   const bgTop  = ch / 2 + backgroundState.panY - (dims.height / 2) * zoom;
   const pxPerM = zoom * 100; // 100 cm = 1 m
 
-  // Adaptive tick density: skip ticks that would be drawn <2 px apart.
-  const tickStep      = pxPerM >= 2 ? 1 : Math.max(1, Math.ceil(2 / pxPerM));
+  // Adaptive tick density: keep ruler ticks aligned with the map grid overlay.
+  const tickStep = typeof window.getMeterTickStep === "function"
+    ? window.getMeterTickStep(pxPerM)
+    : (pxPerM >= 2 ? 1 : Math.max(1, Math.ceil(2 / pxPerM)));
   const labelInterval = pickLabelInterval(pxPerM);
 
   const BG     = "#263238";

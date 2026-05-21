@@ -11,8 +11,19 @@
   </head>
   <body>
     <header class="app-header">
-      <h1>Room Planner</h1>
-      <p>Drag gymnastics equipment from the left panel into the room. Click an object to move, rotate, or delete it.</p>
+      <div class="header-row">
+        <div>
+          <h1>Room Planner</h1>
+          <p>Drag gymnastics equipment from the left panel into the room. Click an object to move, rotate, or delete it.</p>
+        </div>
+        <div class="language-switcher" aria-label="Language switcher">
+          <label id="languageLabel" for="languageSelect">Language</label>
+          <select id="languageSelect" aria-label="Language selector">
+            <option value="en">English</option>
+            <option value="ja">Japanese</option>
+          </select>
+        </div>
+      </div>
     </header>
 
     <main class="layout">
@@ -62,12 +73,10 @@
 
         <section id="actionsTabPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="actionsTabBtn" hidden>
           <section class="controls" aria-label="Scene controls">
-            <button id="dividerBtn" type="button">Add Divider</button>
+            <button id="toggleGridBtn" type="button">Hide Grid</button>
             <button id="deleteBtn" type="button">Delete Selected</button>
             <button id="undoBtn" type="button">Undo (Ctrl+Z)</button>
             <button id="savePlannerBtn" type="button">Save Planner</button>
-            <button id="loadPlannerBtn" type="button">Load Planner</button>
-            <input id="plannerFileInput" type="file" accept="application/json" hidden />
             <button id="clearBtn" type="button" class="danger">Clear Room</button>
           </section>
         </section>
@@ -107,7 +116,8 @@
             </select>
 
             <div class="custom-map-area-actions">
-              <button id="customMapDrawAreaBtn" type="button">Draw Yellow Area</button>
+              <button id="customMapDrawLineBtn" type="button">Draw Yellow Line</button>
+              <button id="customMapDrawFreehandBtn" type="button">Draw Freehand</button>
               <button id="customMapClearAreaBtn" type="button">Remove Yellow Area</button>
             </div>
 
@@ -118,7 +128,7 @@
       </div>
 
       <section class="canvas-wrap" aria-label="Room editor">
-        <div class="canvas-hint" id="hint">Drop objects inside the room</div>
+        <div class="canvas-hint" id="hint"></div>
         <div id="roomCanvas" class="room-canvas" role="application" aria-label="Top-down room canvas"></div>
       </section>
     </main>
@@ -213,6 +223,7 @@
       </form>
     </dialog>
 
+    <script src="js/i18n.js"></script>
     <script src="js/objects.js"></script>
     <script src="js/history.js"></script>
     <script src="js/background.js"></script>

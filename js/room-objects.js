@@ -82,7 +82,7 @@ function createRoomObject(type, x, y) {
     const handle = document.createElement("button");
     handle.type      = "button";
     handle.className = `rotate-handle corner-${corner}`;
-    handle.ariaLabel = "Drag to rotate";
+    handle.ariaLabel = t("label.dragToRotate");
     handle.textContent = "↻";
 
     handle.addEventListener("pointerdown", (event) => {
@@ -124,10 +124,10 @@ function createRoomObject(type, x, y) {
           o.dataset.rotation = String(savedRotation);
           o.style.transform  = `rotate(${savedRotation}deg)`;
           selectObject(objId);
-          setHint("Undo: rotation restored.");
+          setHint(t("hint.undoRotationRestored"));
         });
       }
-      setHint(`Rotated ${obj.dataset.type} to ${obj.dataset.rotation} degrees.`);
+      setHint(t("hint.rotatedTo", { type: obj.dataset.type, degrees: obj.dataset.rotation }));
       rotateState = null;
     });
 
@@ -187,7 +187,7 @@ function createRoomObject(type, x, y) {
           o.style.left = `${savedLeft}px`;
           o.style.top  = `${savedTop}px`;
           selectObject(objId);
-          setHint("Undo: move restored.");
+          setHint(t("hint.undoMoveRestored"));
         });
       }
     }
@@ -200,11 +200,11 @@ function createRoomObject(type, x, y) {
 
   sceneEl.appendChild(obj);
   selectObject(obj.dataset.id);
-  setHint(`${template.label} placed. Drag it to move.`);
+  setHint(t("hint.objectPlaced", { label: template.label }));
   pushUndo(() => {
     obj.remove();
     if (selectedId === obj.dataset.id) selectedId = null;
-    setHint(`Undo: ${template.label} removed.`);
+    setHint(t("hint.undoObjectRemoved", { label: template.label }));
   });
 
   return obj;

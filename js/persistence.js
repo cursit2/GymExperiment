@@ -2,8 +2,37 @@
 
 const PLANNER_SCHEMA_VERSION = 1;
 const PLANNER_LOCAL_STORAGE_KEY = "gym-planner-state-v1";
+const LAST_SERVER_SAVE_NAME_KEY = "gym-planner-last-server-save";
+
+// Per-map equipment/divider storage. Keyed by backgroundSelect.value.
+const perMapObjects = {};
+let currentMapSrc = backgroundSelect?.value || null;
+
+function captureSceneObjects() {
+  const objects = [...roomCanvas.querySelectorAll(".room-object")].map((obj) => ({
+    id: obj.dataset.id,
+    type: obj.dataset.type,
+    x: parseFloat(obj.style.left) + obj.offsetWidth / 2,
+    y: parseFloat(obj.style.top) + obj.offsetHeight / 2,
+    rotation: Number(obj.dataset.rotation) || 0,
+  }));
+  const dividersArr = dividers.map((d) => ({
+    id: d.id,
+    centerX: d.centerX,
+    centerY: d.centerY,
+    angle: d.angle,
+  }));
+  return { objects, dividers: dividersArr };
+}
+
+function saveMapObjectsForSrc(src) {
+  if (!src) return;
+  perMapObjects[src] = captureSceneObjects();
+}
 
 function serializePlannerState() {
+  // Always snapshot the currently selected map before saving.
+  saveMapObjectsForSrc(backgroundSelect?.value || currentMapSrc);
   const objects = [...roomCanvas.querySelectorAll(".room-object")].map((obj) => ({
     id: obj.dataset.id,
     type: obj.dataset.type,
@@ -32,6 +61,7 @@ function serializePlannerState() {
     },
     objects,
     dividers: dividerStates,
+    perMapObjects,
   };
 }
 
@@ -62,9 +92,60 @@ function clearPlannerScene() {
   selectedDividerId = null;
 }
 
+function saveCurrentMapObjects() {
+  if (!currentMapSrc) currentMapSrc = backgroundSelect?.value || null;
+  saveMapObjectsForSrc(currentMapSrc);
+}
+
+// Save old map's objects, clear the scene, then restore objects for newSrc.
+// Pass { clearStore: true } when activating a brand-new map (e.g. after "New Map"
+// or Google import) so the fresh map starts empty.
+function switchMapObjects(newSrc, { clearStore = false } = {}) {
+  saveCurrentMapObjects();
+  if (clearStore) delete perMapObjects[newSrc];
+
+  const saved = perMapObjects[newSrc] || { objects: [], dividers: [] };
+
+  withHistorySuppressed(() => {
+    clearPlannerScene();
+
+    saved.objects.forEach((savedObj) => {
+      if (!objectCatalog[savedObj.type]) return;
+      const created = createRoomObject(savedObj.type, savedObj.x, savedObj.y);
+      if (!created) return;
+      created.dataset.id = String(savedObj.id);
+      const rotation = Number(savedObj.rotation) || 0;
+      created.dataset.rotation = String(rotation);
+      created.style.transform = `rotate(${rotation}deg)`;
+    });
+
+    saved.dividers.forEach((savedDiv) => {
+      const created = addDivider();
+      if (!created) return;
+      created.id = String(savedDiv.id);
+      created.lineEl.dataset.dividerId = String(savedDiv.id);
+      created.centerX = Number(savedDiv.centerX) || 0;
+      created.centerY = Number(savedDiv.centerY) || 0;
+      created.angle = Number(savedDiv.angle) || 0;
+      renderDivider(created);
+    });
+  });
+
+  const maxObjectId = [...roomCanvas.querySelectorAll(".room-object")]
+    .reduce((max, obj) => Math.max(max, Number(obj.dataset.id) || 0), 0);
+  idCounter = maxObjectId + 1;
+
+  const maxDividerId = dividers.reduce((max, d) => Math.max(max, Number(d.id) || 0), 0);
+  dividerIdCounter = maxDividerId + 1;
+
+  deselectAll();
+  deselectDivider();
+  currentMapSrc = newSrc;
+}
+
 function applyPlannerState(state) {
   if (!isValidPlannerState(state)) {
-    throw new Error("Invalid planner file format.");
+    throw new Error(t("error.invalidPlannerFileFormat"));
   }
 
   withHistorySuppressed(() => {
@@ -104,6 +185,7 @@ function applyPlannerState(state) {
           Number(custom.height),
           String(custom.colorName),
           String(custom.name || "Custom Map"),
+          custom.mapMeta || null,
         );
       }
     }
@@ -113,7 +195,19 @@ function applyPlannerState(state) {
     }
     applyBackground(backgroundSelect.value);
 
-    state.objects.forEach((saved) => {
+    // Restore per-map object store, clearing any stale in-memory state.
+    Object.keys(perMapObjects).forEach((k) => delete perMapObjects[k]);
+    if (state.perMapObjects && typeof state.perMapObjects === "object") {
+      Object.assign(perMapObjects, state.perMapObjects);
+    }
+    const currentSrc = backgroundSelect.value;
+    if (!perMapObjects[currentSrc]) {
+      // Old save format: seed the current map's entry from the top-level arrays.
+      perMapObjects[currentSrc] = { objects: state.objects, dividers: state.dividers };
+    }
+    const { objects: objectsToRestore, dividers: dividersToRestore } = perMapObjects[currentSrc];
+
+    objectsToRestore.forEach((saved) => {
       if (!objectCatalog[saved.type]) return;
       const created = createRoomObject(saved.type, saved.x, saved.y);
       if (!created) return;
@@ -123,7 +217,7 @@ function applyPlannerState(state) {
       created.style.transform = `rotate(${rotation}deg)`;
     });
 
-    state.dividers.forEach((saved) => {
+    dividersToRestore.forEach((saved) => {
       const created = addDivider();
       if (!created) return;
       created.id = String(saved.id);
@@ -150,6 +244,7 @@ function applyPlannerState(state) {
 
   deselectAll();
   deselectDivider();
+  currentMapSrc = backgroundSelect.value;
 }
 
 function savePlannerToLocalStorage() {
@@ -157,28 +252,96 @@ function savePlannerToLocalStorage() {
   localStorage.setItem(PLANNER_LOCAL_STORAGE_KEY, payload);
 }
 
-async function savePlannerToServer(name = 'autosave') {
+function toServerSafeSaveName(value) {
+  const normalized = String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 90);
+  return normalized || "map_default";
+}
+
+function getCurrentMapSaveName() {
+  const src = backgroundSelect?.value || currentMapSrc || "default";
+  if (src === CUSTOM_BACKGROUND_KEY && customBackgroundConfig) {
+    const customIdentity = customBackgroundConfig.name
+      || customBackgroundConfig.imageSource
+      || `${customBackgroundConfig.width}x${customBackgroundConfig.height}`;
+    return `map_${toServerSafeSaveName(`${src}_${customIdentity}`)}`;
+  }
+  return `map_${toServerSafeSaveName(src)}`;
+}
+
+async function deletePlannerSaveFromServer(name) {
+  const saveName = name || localStorage.getItem(LAST_SERVER_SAVE_NAME_KEY) || getCurrentMapSaveName();
+  if (!saveName) return false;
+
+  try {
+    const res = await fetch(`/api/saves/${encodeURIComponent(saveName)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) return false;
+    if (localStorage.getItem(LAST_SERVER_SAVE_NAME_KEY) === saveName) {
+      localStorage.removeItem(LAST_SERVER_SAVE_NAME_KEY);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function savePlannerToServer(name, options = {}) {
+  const saveName = name || getCurrentMapSaveName();
+  const silent = options.silent !== false;
   try {
     const payload = JSON.stringify(serializePlannerState());
-    await fetch(`/api/saves/${encodeURIComponent(name)}`, {
+    localStorage.setItem(PLANNER_LOCAL_STORAGE_KEY, payload);
+    const res = await fetch(`/api/saves/${encodeURIComponent(saveName)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: payload,
     });
-  } catch {
-    // Server not available (e.g. opened directly as a file) — ignore silently.
+
+    if (!res.ok) {
+      throw new Error(`Save failed (${res.status})`);
+    }
+
+    localStorage.setItem(LAST_SERVER_SAVE_NAME_KEY, saveName);
+
+    if (!silent) {
+      setHint(t("hint.plannerSavedDisk"));
+    }
+    return true;
+  } catch (error) {
+    if (!silent) {
+      console.error(error);
+      setHint(t("hint.unableSaveDisk"));
+    }
+    return false;
   }
 }
 
-async function loadPlannerFromServer(name = 'autosave') {
+async function loadPlannerFromServer(name) {
+  const preferredName = name || localStorage.getItem(LAST_SERVER_SAVE_NAME_KEY) || getCurrentMapSaveName();
+  const candidates = [
+    preferredName,
+    getCurrentMapSaveName(),
+    "autosave",
+  ].filter((value, index, arr) => value && arr.indexOf(value) === index);
+
   try {
-    const res = await fetch(`/api/saves/${encodeURIComponent(name)}`);
-    if (!res.ok) return false;
-    const parsed = await res.json();
-    applyPlannerState(parsed);
-    clearUndoStack();
-    setHint('Planner restored from server save.');
-    return true;
+    for (const saveName of candidates) {
+      const res = await fetch(`/api/saves/${encodeURIComponent(saveName)}`);
+      if (!res.ok) continue;
+      const parsed = await res.json();
+      applyPlannerState(parsed);
+      localStorage.setItem(PLANNER_LOCAL_STORAGE_KEY, JSON.stringify(parsed));
+      localStorage.setItem(LAST_SERVER_SAVE_NAME_KEY, saveName);
+      clearUndoStack();
+      setHint(t("hint.plannerRestoredServer"));
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -190,7 +353,7 @@ function loadPlannerFromLocalStorage() {
   const parsed = JSON.parse(raw);
   applyPlannerState(parsed);
   clearUndoStack();
-  setHint("Planner restored from local save.");
+  setHint(t("hint.plannerRestoredLocal"));
   return true;
 }
 
@@ -205,7 +368,7 @@ function savePlannerToFile() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-  setHint("Planner file saved.");
+  setHint(t("hint.plannerFileSaved"));
 }
 
 async function loadPlannerFromFile(file) {
@@ -214,7 +377,7 @@ async function loadPlannerFromFile(file) {
   applyPlannerState(parsed);
   clearUndoStack();
   savePlannerToLocalStorage();
-  setHint("Planner file loaded.");
+  setHint(t("hint.plannerFileLoaded"));
 }
 
 function startPlannerAutosave() {
@@ -232,3 +395,7 @@ function startPlannerAutosave() {
     serverSaveTimer = setTimeout(() => savePlannerToServer(), 3000);
   }, 800);
 }
+
+window.switchMapObjects = switchMapObjects;
+window.getCurrentMapSaveName = getCurrentMapSaveName;
+window.deletePlannerSaveFromServer = deletePlannerSaveFromServer;

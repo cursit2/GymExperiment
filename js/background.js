@@ -36,7 +36,8 @@ const customMapNameInput = document.getElementById("customMapNameInput");
 const customMapWidthInput = document.getElementById("customMapWidthInput");
 const customMapHeightInput = document.getElementById("customMapHeightInput");
 const customMapColorSelect = document.getElementById("customMapColorSelect");
-const customMapDrawAreaBtn = document.getElementById("customMapDrawAreaBtn");
+const customMapDrawLineBtn = document.getElementById("customMapDrawLineBtn");
+const customMapDrawFreehandBtn = document.getElementById("customMapDrawFreehandBtn");
 const customMapClearAreaBtn = document.getElementById("customMapClearAreaBtn");
 const deleteCustomMapBtn = document.getElementById("deleteCustomMapBtn");
 
@@ -53,14 +54,13 @@ const backgroundState = {
 };
 
 const backgroundDimensions = {
-  "assets/room-topdown.svg": { width: 1400, height: 900 },
   "assets/gym-floor-topdown-4000x7000cm.svg": { width: 4000, height: 7000 },
 };
 
 const backgroundSources = {
-  "assets/room-topdown.svg": "assets/room-topdown.svg",
   "assets/gym-floor-topdown-4000x7000cm.svg": "assets/gym-floor-topdown-4000x7000cm.svg",
 };
+const discoveredBackgroundLabels = {};
 
 const CUSTOM_BACKGROUND_KEY = "custom-map";
 const BASIC_MAP_COLORS = {
@@ -105,11 +105,22 @@ const backgroundImg = document.createElement("img");
 backgroundImg.className = "room-background-img";
 backgroundImg.alt = "";
 backgroundImg.draggable = false;
-backgroundImg.addEventListener("load", () => sizeBackgroundImg());
+backgroundImg.addEventListener("load", () => {
+  const src = backgroundSelect.value;
+  const dims = backgroundDimensions[src];
+  if (!dims && Number.isFinite(backgroundImg.naturalWidth) && Number.isFinite(backgroundImg.naturalHeight)
+    && backgroundImg.naturalWidth > 0 && backgroundImg.naturalHeight > 0) {
+    backgroundDimensions[src] = {
+      width: Math.round(backgroundImg.naturalWidth),
+      height: Math.round(backgroundImg.naturalHeight),
+    };
+  }
+  sizeBackgroundImg();
+});
 backgroundImg.addEventListener("error", () => {
   const src = backgroundImg.getAttribute("src") || "";
   if (/^https?:\/\//i.test(src)) {
-    setHint("Satellite image failed to display. Check that 'Maps Static API' is enabled for this API key in Google Cloud Console.");
+    setHint(t("hint.satelliteDisplayFailed"));
   }
 });
 sceneEl.appendChild(backgroundImg);
@@ -123,8 +134,21 @@ sceneEl.appendChild(backgroundAnnotationsSvg);
 
 roomCanvas.appendChild(sceneEl);
 
+const backgroundGridCanvas = document.createElement("canvas");
+backgroundGridCanvas.className = "background-grid";
+backgroundGridCanvas.setAttribute("aria-hidden", "true");
+backgroundGridCanvas.style.position = "absolute";
+backgroundGridCanvas.style.left = "0";
+backgroundGridCanvas.style.top = "0";
+backgroundGridCanvas.style.width = "100%";
+backgroundGridCanvas.style.height = "100%";
+backgroundGridCanvas.style.pointerEvents = "none";
+backgroundGridCanvas.style.zIndex = "1";
+roomCanvas.appendChild(backgroundGridCanvas);
+
 const sidebarDrawState = {
   enabled: false,
+  mode: null,
   pointerId: null,
   activePath: null,
   previousMoveMode: true,
@@ -162,16 +186,23 @@ customMapColorSelect?.addEventListener("change", () => {
   updateCurrentCustomMap({ colorName: customMapColorSelect.value });
 });
 
-deleteCustomMapBtn?.addEventListener("click", () => {
-  const mapName = customBackgroundConfig?.name || "this custom map";
-  const confirmed = window.confirm(`Delete ${mapName}? This cannot be undone.`);
+deleteCustomMapBtn?.addEventListener("click", async () => {
+  const mapName = customBackgroundConfig?.name || t("label.mapName");
+  const confirmed = window.confirm(t("confirm.deleteCustomMap", { name: mapName }));
   if (!confirmed) {
-    setHint("Custom map delete canceled.");
+    setHint(t("hint.customMapDeleteCanceled"));
     return;
+  }
+
+  const saveName = window.getCurrentMapSaveName?.()
+    || localStorage.getItem("gym-planner-last-server-save");
+  if (saveName) {
+    await window.deletePlannerSaveFromServer?.(saveName);
   }
 
   if (deleteCurrentCustomMap()) {
     savePlannerToLocalStorage();
+    await window.refreshSavedMapOptions?.();
   }
 });
 
@@ -179,6 +210,7 @@ deleteCustomMapBtn?.addEventListener("click", () => {
 // Utilities
 
 function setHint(message) {
+  if (!hint) return;
   hint.textContent = message;
 }
 
@@ -216,8 +248,9 @@ function syncCustomMapEditor() {
   const isCustom = backgroundSelect.value === CUSTOM_BACKGROUND_KEY && Boolean(customBackgroundConfig);
   const isImageMap = isCustom && customBackgroundConfig.sourceType === "image";
 
-  if (!isImageMap && sidebarDrawState.enabled) {
+  if (!isCustom && sidebarDrawState.enabled) {
     sidebarDrawState.enabled = false;
+    sidebarDrawState.mode = null;
     backgroundState.moveMode = sidebarDrawState.previousMoveMode;
     sidebarDrawState.pointerId = null;
     sidebarDrawState.activePath = null;
@@ -240,12 +273,16 @@ function syncCustomMapEditor() {
   customMapWidthInput.disabled = !isCustom || isImageMap;
   customMapHeightInput.disabled = !isCustom || isImageMap;
   customMapColorSelect.disabled = !isCustom || isImageMap;
-  if (customMapDrawAreaBtn) {
-    customMapDrawAreaBtn.disabled = !isImageMap;
-    customMapDrawAreaBtn.classList.toggle("active", sidebarDrawState.enabled && isImageMap);
+  if (customMapDrawLineBtn) {
+    customMapDrawLineBtn.disabled = !isCustom;
+    customMapDrawLineBtn.classList.toggle("active", sidebarDrawState.enabled && sidebarDrawState.mode === "line" && isCustom);
+  }
+  if (customMapDrawFreehandBtn) {
+    customMapDrawFreehandBtn.disabled = !isCustom;
+    customMapDrawFreehandBtn.classList.toggle("active", sidebarDrawState.enabled && sidebarDrawState.mode === "freehand" && isCustom);
   }
   if (customMapClearAreaBtn) {
-    customMapClearAreaBtn.disabled = !isImageMap;
+    customMapClearAreaBtn.disabled = !isCustom;
   }
 }
 
@@ -259,18 +296,183 @@ function syncBackgroundSelectTitle() {
   syncCustomMapEditor();
 }
 
+function ensureBackgroundSelectOptions() {
+  const labelBySource = {
+    "assets/gym-floor-topdown-4000x7000cm.svg": "Gym Floor (2 Courts)",
+  };
+
+  Object.keys(backgroundSources).forEach((source) => {
+    let option = backgroundSelect.querySelector(`option[value="${source}"]`);
+    if (!option) {
+      option = document.createElement("option");
+      option.value = source;
+      backgroundSelect.appendChild(option);
+    }
+    if (!option.textContent || !option.textContent.trim()) {
+      option.textContent = labelBySource[source] || discoveredBackgroundLabels[source] || source;
+    }
+    if (option.textContent === source && discoveredBackgroundLabels[source]) {
+      option.textContent = discoveredBackgroundLabels[source];
+    }
+    option.dataset.fullLabel = option.textContent;
+  });
+
+  if (!backgroundSources[backgroundSelect.value]) {
+    const fallback = Object.keys(backgroundSources)[0];
+    if (fallback) backgroundSelect.value = fallback;
+  }
+
+  syncBackgroundSelectTitle();
+}
+
+ensureBackgroundSelectOptions();
+
+async function loadBackgroundCatalogFromServer() {
+  try {
+    const res = await fetch("/api/backgrounds");
+    if (!res.ok) return;
+    const items = await res.json();
+    if (!Array.isArray(items)) return;
+
+    items.forEach((item) => {
+      const src = String(item?.src || "").trim();
+      if (!src || src === CUSTOM_BACKGROUND_KEY) return;
+
+      backgroundSources[src] = src;
+      discoveredBackgroundLabels[src] = String(item.label || src);
+      if (Number.isFinite(item.width) && Number.isFinite(item.height) && item.width > 0 && item.height > 0) {
+        backgroundDimensions[src] = {
+          width: Number(item.width),
+          height: Number(item.height),
+        };
+      }
+    });
+
+    ensureBackgroundSelectOptions();
+    if (typeof window.applyI18n === "function") {
+      window.applyI18n();
+    }
+  } catch {
+    // Keep defaults when background discovery is unavailable.
+  }
+}
+
+loadBackgroundCatalogFromServer();
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+let gridOverlayVisible = true;
+
+const toggleGridBtn = document.getElementById("toggleGridBtn");
+
+function syncToggleGridBtn() {
+  if (!toggleGridBtn) return;
+  toggleGridBtn.classList.toggle("active", gridOverlayVisible);
+  toggleGridBtn.textContent = gridOverlayVisible ? t("btn.hideGrid") : t("btn.showGrid");
+}
+
+toggleGridBtn?.addEventListener("click", () => {
+  gridOverlayVisible = !gridOverlayVisible;
+  syncToggleGridBtn();
+  renderBackgroundGrid();
+});
+
+function getMeterTickStep(pxPerM) {
+  return pxPerM >= 2 ? 1 : Math.max(1, Math.ceil(2 / pxPerM));
+}
+
+function renderBackgroundGrid() {
+  const canvasWidth = roomCanvas.clientWidth;
+  const canvasHeight = roomCanvas.clientHeight;
+  backgroundGridCanvas.width = Math.max(0, canvasWidth);
+  backgroundGridCanvas.height = Math.max(0, canvasHeight);
+
+  const ctx = backgroundGridCanvas.getContext("2d");
+  if (!ctx || canvasWidth <= 0 || canvasHeight <= 0) return;
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+  if (!gridOverlayVisible) return;
+
+  const dims = backgroundDimensions[backgroundSelect.value];
+  if (!dims) return;
+
+  const bgLeft = canvasWidth / 2 + backgroundState.panX - (dims.width / 2) * backgroundState.zoom;
+  const bgTop = canvasHeight / 2 + backgroundState.panY - (dims.height / 2) * backgroundState.zoom;
+  const bgWidth = dims.width * backgroundState.zoom;
+  const bgHeight = dims.height * backgroundState.zoom;
+  const pxPerM = backgroundState.zoom * 100;
+  const tickStep = getMeterTickStep(pxPerM);
+  const totalMetersX = Math.floor(dims.width / 100);
+  const totalMetersY = Math.floor(dims.height / 100);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(bgLeft, bgTop, bgWidth, bgHeight);
+  ctx.clip();
+
+  for (let meter = 0; meter <= totalMetersX; meter += tickStep) {
+    const x = bgLeft + meter * pxPerM;
+    if (x < 0 || x > canvasWidth) continue;
+    const isMajor = meter % 10 === 0;
+    const isMid = meter % 5 === 0;
+    if (isMajor) {
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 5]);
+      ctx.strokeStyle = "rgba(50, 90, 105, 0.45)";
+    } else if (isMid) {
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 6]);
+      ctx.strokeStyle = "rgba(60, 95, 110, 0.28)";
+    } else {
+      ctx.lineWidth = 1;
+      ctx.setLineDash([1, 7]);
+      ctx.strokeStyle = "rgba(68, 102, 112, 0.10)";
+    }
+    ctx.beginPath();
+    ctx.moveTo(Math.round(x) + 0.5, bgTop);
+    ctx.lineTo(Math.round(x) + 0.5, bgTop + bgHeight);
+    ctx.stroke();
+  }
+
+  for (let meter = 0; meter <= totalMetersY; meter += tickStep) {
+    const y = bgTop + meter * pxPerM;
+    if (y < 0 || y > canvasHeight) continue;
+    const isMajor = meter % 10 === 0;
+    const isMid = meter % 5 === 0;
+    if (isMajor) {
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 5]);
+      ctx.strokeStyle = "rgba(50, 90, 105, 0.45)";
+    } else if (isMid) {
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 6]);
+      ctx.strokeStyle = "rgba(60, 95, 110, 0.28)";
+    } else {
+      ctx.lineWidth = 1;
+      ctx.setLineDash([1, 7]);
+      ctx.strokeStyle = "rgba(68, 102, 112, 0.10)";
+    }
+    ctx.beginPath();
+    ctx.moveTo(bgLeft, Math.round(y) + 0.5);
+    ctx.lineTo(bgLeft + bgWidth, Math.round(y) + 0.5);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+window.getMeterTickStep = getMeterTickStep;
+
 function getCustomImageAnnotations() {
-  if (!customBackgroundConfig || customBackgroundConfig.sourceType !== "image") return [];
+  if (!customBackgroundConfig) return [];
   const annotations = customBackgroundConfig.mapMeta?.annotations;
   return Array.isArray(annotations) ? annotations : [];
 }
 
 function setCustomImageAnnotations(annotations) {
-  if (!customBackgroundConfig || customBackgroundConfig.sourceType !== "image") return;
+  if (!customBackgroundConfig) return;
   customBackgroundConfig.mapMeta = {
     ...(customBackgroundConfig.mapMeta || {}),
     annotations,
@@ -315,15 +517,14 @@ function appendAnnotationPath(path) {
 
 function renderSidebarMapAnnotations() {
   const dims = backgroundDimensions[backgroundSelect.value];
-  const isCustomImage = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
-    && customBackgroundConfig
-    && customBackgroundConfig.sourceType === "image";
+  const isCustomMap = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
+    && customBackgroundConfig;
 
   while (backgroundAnnotationsSvg.firstChild) {
     backgroundAnnotationsSvg.removeChild(backgroundAnnotationsSvg.firstChild);
   }
 
-  if (!isCustomImage || !dims) {
+  if (!isCustomMap || !dims) {
     backgroundAnnotationsSvg.style.display = "none";
     return;
   }
@@ -341,11 +542,46 @@ function renderSidebarMapAnnotations() {
   }
 }
 
+function setSidebarDrawMode(mode) {
+  const isCustomMap = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
+    && customBackgroundConfig;
+  if (!isCustomMap) {
+    setHint(t("hint.selectCustomMapForDraw"));
+    return;
+  }
+
+  const normalizedMode = mode === "line" || mode === "freehand" ? mode : null;
+  const nextMode = sidebarDrawState.enabled && sidebarDrawState.mode === normalizedMode ? null : normalizedMode;
+
+  if (sidebarDrawState.pointerId != null && roomCanvas.hasPointerCapture(sidebarDrawState.pointerId)) {
+    roomCanvas.releasePointerCapture(sidebarDrawState.pointerId);
+  }
+
+  if (!sidebarDrawState.enabled && nextMode) {
+    sidebarDrawState.previousMoveMode = backgroundState.moveMode;
+  }
+
+  sidebarDrawState.enabled = Boolean(nextMode);
+  sidebarDrawState.mode = nextMode;
+  sidebarDrawState.pointerId = null;
+  sidebarDrawState.activePath = null;
+  backgroundState.moveMode = nextMode ? false : sidebarDrawState.previousMoveMode;
+  renderBackgroundView();
+  renderSidebarMapAnnotations();
+  syncCustomMapEditor();
+
+  if (!nextMode) {
+    setHint(t("hint.drawModeDisabled"));
+    return;
+  }
+
+  setHint(t(nextMode === "line" ? "hint.drawLineModeEnabled" : "hint.drawFreehandModeEnabled"));
+}
+
 function beginSidebarAnnotationDraw(event) {
-  const isCustomImage = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
-    && customBackgroundConfig
-    && customBackgroundConfig.sourceType === "image";
-  if (!sidebarDrawState.enabled || !isCustomImage) return;
+  const isCustomMap = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
+    && customBackgroundConfig;
+  if (!sidebarDrawState.enabled || !isCustomMap) return;
   if (
     event.target.closest(".room-object") ||
     event.target.closest(".room-divider") ||
@@ -371,6 +607,16 @@ function updateSidebarAnnotationDraw(event) {
   const scene = clientToSceneCoords(event.clientX, event.clientY);
   const mapPoint = scenePointToMapPoint(scene.x, scene.y);
   if (!mapPoint) return;
+  if (sidebarDrawState.mode === "line") {
+    if (sidebarDrawState.activePath.length === 1) {
+      sidebarDrawState.activePath.push(mapPoint);
+    } else {
+      sidebarDrawState.activePath[1] = mapPoint;
+    }
+    renderSidebarMapAnnotations();
+    return;
+  }
+
   const last = sidebarDrawState.activePath[sidebarDrawState.activePath.length - 1];
   if (!last || last.x !== mapPoint.x || last.y !== mapPoint.y) {
     sidebarDrawState.activePath.push(mapPoint);
@@ -400,38 +646,22 @@ roomCanvas.addEventListener("pointermove", updateSidebarAnnotationDraw);
 roomCanvas.addEventListener("pointerup", finishSidebarAnnotationDraw);
 roomCanvas.addEventListener("pointercancel", finishSidebarAnnotationDraw);
 
-customMapDrawAreaBtn?.addEventListener("click", () => {
-  const isCustomImage = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
-    && customBackgroundConfig
-    && customBackgroundConfig.sourceType === "image";
-  if (!isCustomImage) {
-    setHint("Select an imported custom map to draw yellow areas.");
-    return;
-  }
+customMapDrawLineBtn?.addEventListener("click", () => {
+  setSidebarDrawMode("line");
+});
 
-  sidebarDrawState.enabled = !sidebarDrawState.enabled;
-  customMapDrawAreaBtn.classList.toggle("active", sidebarDrawState.enabled);
-  if (sidebarDrawState.enabled) {
-    sidebarDrawState.previousMoveMode = backgroundState.moveMode;
-    backgroundState.moveMode = false;
-    renderBackgroundView();
-    setHint("Draw mode enabled. Drag on the map to draw yellow areas.");
-  } else {
-    backgroundState.moveMode = sidebarDrawState.previousMoveMode;
-    renderBackgroundView();
-    setHint("Draw mode disabled.");
-  }
+customMapDrawFreehandBtn?.addEventListener("click", () => {
+  setSidebarDrawMode("freehand");
 });
 
 customMapClearAreaBtn?.addEventListener("click", () => {
-  const isCustomImage = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
-    && customBackgroundConfig
-    && customBackgroundConfig.sourceType === "image";
-  if (!isCustomImage) return;
+  const isCustomMap = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
+    && customBackgroundConfig;
+  if (!isCustomMap) return;
   setCustomImageAnnotations([]);
   renderSidebarMapAnnotations();
   savePlannerToLocalStorage();
-  setHint("Yellow areas removed from this map.");
+  setHint(t("hint.yellowAreasRemoved"));
 });
 
 syncCustomMapEditor();
@@ -454,14 +684,14 @@ function buildCustomMapSvgData(widthCm, heightCm, colorHex) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-function registerCustomMap(widthCm, heightCm, colorName, mapName = "Custom Map") {
+function registerCustomMap(widthCm, heightCm, colorName, mapName = "Custom Map", mapMeta = null) {
   const hex = BASIC_MAP_COLORS[colorName];
   if (!hex) {
-    throw new Error("Unsupported map color.");
+    throw new Error(t("error.unsupportedMapColor"));
   }
 
   if (!Number.isFinite(widthCm) || !Number.isFinite(heightCm) || widthCm <= 0 || heightCm <= 0) {
-    throw new Error("Map dimensions must be greater than 0 cm.");
+    throw new Error(t("error.mapDimensionsPositive"));
   }
 
   const name = String(mapName).trim() || "Custom Map";
@@ -474,6 +704,7 @@ function registerCustomMap(widthCm, heightCm, colorName, mapName = "Custom Map")
     height: heightCm,
     colorName,
     colorHex: hex,
+    mapMeta: mapMeta ? JSON.parse(JSON.stringify(mapMeta)) : null,
   };
 
   let option = backgroundSelect.querySelector(`option[value="${CUSTOM_BACKGROUND_KEY}"]`);
@@ -489,13 +720,13 @@ function registerCustomMap(widthCm, heightCm, colorName, mapName = "Custom Map")
 
 function registerCustomImageMap(widthCm, heightCm, mapName, imageSource, mapMeta = null) {
   if (!Number.isFinite(widthCm) || !Number.isFinite(heightCm) || widthCm <= 0 || heightCm <= 0) {
-    throw new Error("Map dimensions must be greater than 0 cm.");
+    throw new Error(t("error.mapDimensionsPositive"));
   }
   const normalizedImageSource = String(imageSource || "").trim();
   const isDataImage = normalizedImageSource.startsWith("data:image/");
   const isRemoteImage = /^https?:\/\//i.test(normalizedImageSource);
   if (!isDataImage && !isRemoteImage) {
-    throw new Error("Custom image map data is invalid.");
+    throw new Error(t("error.customImageInvalid"));
   }
 
   const name = String(mapName).trim() || "Imported Map";
@@ -533,13 +764,13 @@ function clearCustomMapRegistration() {
 
 function deleteCurrentCustomMap() {
   if (!customBackgroundConfig) {
-    setHint("No custom map to delete.");
+    setHint(t("hint.noCustomMapDelete"));
     return false;
   }
 
   clearCustomMapRegistration();
   if (!backgroundDimensions[backgroundSelect.value]) {
-    backgroundSelect.value = "assets/room-topdown.svg";
+    backgroundSelect.value = "assets/gym-floor-topdown-4000x7000cm.svg";
   }
   applyBackground(backgroundSelect.value);
   backgroundState.zoom = getFitZoom();
@@ -547,7 +778,8 @@ function deleteCurrentCustomMap() {
   backgroundState.panY = 0;
   clampBackgroundPan();
   renderBackgroundView();
-  setHint("Custom map deleted.");
+  window.switchMapObjects?.(backgroundSelect.value);
+  setHint(t("hint.customMapDeleted"));
   return true;
 }
 
@@ -556,7 +788,7 @@ window.deleteCurrentCustomMap = deleteCurrentCustomMap;
 
 function updateCurrentCustomMap(changes) {
   if (backgroundSelect.value !== CUSTOM_BACKGROUND_KEY || !customBackgroundConfig) {
-    setHint("Select a custom map to edit its properties.");
+    setHint(t("hint.selectCustomMapEdit"));
     syncCustomMapEditor();
     return false;
   }
@@ -568,26 +800,26 @@ function updateCurrentCustomMap(changes) {
   const isImageMap = customBackgroundConfig.sourceType === "image";
 
   if (!nextName) {
-    setHint("Custom map name cannot be empty.");
+    setHint(t("hint.customMapNameEmpty"));
     syncCustomMapEditor();
     return false;
   }
 
   if (!Number.isFinite(nextWidth) || !Number.isFinite(nextHeight) || nextWidth <= 0 || nextHeight <= 0) {
-    setHint("Custom map size must be greater than 0 cm.");
+    setHint(t("hint.customMapSizePositive"));
     syncCustomMapEditor();
     return false;
   }
 
   if (isImageMap && ((changes.width != null && Number(changes.width) !== Number(customBackgroundConfig.width))
     || (changes.height != null && Number(changes.height) !== Number(customBackgroundConfig.height)))) {
-    setHint("Width and height are locked for imported maps.");
+    setHint(t("hint.importedDimsLocked"));
     syncCustomMapEditor();
     return false;
   }
 
   if (!isImageMap && !BASIC_MAP_COLORS[nextColor]) {
-    setHint("Invalid custom map color.");
+    setHint(t("hint.invalidCustomMapColor"));
     syncCustomMapEditor();
     return false;
   }
@@ -601,19 +833,19 @@ function updateCurrentCustomMap(changes) {
       customBackgroundConfig.mapMeta || null,
     );
   } else {
-    registerCustomMap(Math.round(nextWidth), Math.round(nextHeight), nextColor, nextName);
+    registerCustomMap(Math.round(nextWidth), Math.round(nextHeight), nextColor, nextName, customBackgroundConfig.mapMeta || null);
   }
   backgroundSelect.value = CUSTOM_BACKGROUND_KEY;
   applyBackground(backgroundSelect.value);
   clampBackgroundPan();
   renderBackgroundView();
-  setHint("Custom map updated.");
+  setHint(t("hint.customMapUpdated"));
   return true;
 }
 
 function promptForNewMap() {
   if (!newMapDialog || !newMapForm) {
-    setHint("New map dialog is unavailable.");
+    setHint(t("hint.newMapDialogUnavailable"));
     return false;
   }
 
@@ -641,33 +873,50 @@ function promptForNewMap() {
     const colorName = newMapColorSelect.value;
 
     if (!mapName) {
-      setHint("Please enter a map name.");
+      setHint(t("hint.enterMapName"));
       return;
     }
 
     const isValidWidth = Number.isFinite(widthCm) && widthCm > 0;
     const isValidHeight = Number.isFinite(heightCm) && heightCm > 0;
     if (!isValidWidth || !isValidHeight) {
-      setHint("Map size must be greater than 0 cm.");
+      setHint(t("hint.mapSizePositive"));
       return;
     }
 
     if (!BASIC_MAP_COLORS[colorName]) {
-      setHint("Invalid color choice.");
+      setHint(t("hint.invalidColorChoice"));
       return;
     }
 
-    registerCustomMap(Math.round(widthCm), Math.round(heightCm), colorName, mapName);
-    backgroundSelect.value = CUSTOM_BACKGROUND_KEY;
-    applyBackground(backgroundSelect.value);
-    backgroundState.zoom = getFitZoom();
-    backgroundState.panX = 0;
-    backgroundState.panY = 0;
-    clampBackgroundPan();
-    renderBackgroundView();
-    setHint(`Custom map created: ${mapName} (${Math.round(widthCm)}x${Math.round(heightCm)} cm, ${colorName}).`);
-    syncCustomMapEditor();
-    closeDialog();
+    try {
+      registerCustomMap(Math.round(widthCm), Math.round(heightCm), colorName, mapName);
+      backgroundSelect.value = CUSTOM_BACKGROUND_KEY;
+      window.switchMapObjects?.(CUSTOM_BACKGROUND_KEY, { clearStore: true });
+      applyBackground(backgroundSelect.value);
+      backgroundState.zoom = getFitZoom();
+      backgroundState.panX = 0;
+      backgroundState.panY = 0;
+      clampBackgroundPan();
+      renderBackgroundView();
+
+      // Persist immediately so a refresh right after creation keeps the map.
+      savePlannerToLocalStorage();
+      savePlannerToServer();
+
+      syncCustomMapEditor();
+      closeDialog();
+
+      setHint(t("hint.customMapCreated", {
+        name: mapName,
+        width: Math.round(widthCm),
+        height: Math.round(heightCm),
+        color: colorName,
+      }));
+    } catch (error) {
+      console.error(error);
+      setHint(error?.message || t("hint.unableLoadGooglePreview"));
+    }
   };
 
   newMapForm.addEventListener("submit", handleCreate);
@@ -679,7 +928,7 @@ function promptForNewMap() {
 
 function parseGoogleMapsContext(link) {
   const text = String(link || "").trim();
-  if (!text) throw new Error("Google Maps link is required.");
+  if (!text) throw new Error(t("error.googleMapsLinkRequired"));
 
   // Format 1: @lat,lng,zoomz (e.g., @42.8770583,143.1712503,15z)
   const zoomMatch = text.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(\d+(?:\.\d+)?)z/i);
@@ -728,7 +977,7 @@ function parseGoogleMapsContext(link) {
     // Not a valid URL, fall through to error
   }
 
-  throw new Error("Unable to detect latitude/zoom from link. Use a Google Maps URL (e.g., paste the link from your browser address bar).");
+  throw new Error(t("error.unableDetectLatZoom"));
 }
 
 function metersPerPixelAtLatitude(latitude, zoom) {
@@ -747,7 +996,7 @@ function loadGoogleMapsApi() {
     const existing = document.querySelector('script[data-google-maps-api="true"]');
     if (existing) {
       existing.addEventListener("load", () => resolve(window.google.maps), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Failed to load Google Maps API.")), { once: true });
+      existing.addEventListener("error", () => reject(new Error(t("error.failedLoadGoogleMapsApi"))), { once: true });
       return;
     }
 
@@ -760,10 +1009,10 @@ function loadGoogleMapsApi() {
       if (window.google?.maps?.Map) {
         resolve(window.google.maps);
       } else {
-        reject(new Error("Google Maps API loaded without map support."));
+        reject(new Error(t("error.googleMapsApiNoMapSupport")));
       }
     }, { once: true });
-    script.addEventListener("error", () => reject(new Error("Failed to load Google Maps API.")), { once: true });
+    script.addEventListener("error", () => reject(new Error(t("error.failedLoadGoogleMapsApi"))), { once: true });
     document.head.appendChild(script);
   });
 
@@ -780,7 +1029,7 @@ function buildGoogleMapsShareUrl(latitude, longitude, zoom) {
 async function ensureGooglePreviewMap() {
   if (googleImportState.map) return googleImportState.map;
   if (!googleMapPreviewMap) {
-    throw new Error("Google map preview container is unavailable.");
+    throw new Error(t("error.googleMapPreviewUnavailable"));
   }
 
   await loadGoogleMapsApi();
@@ -824,7 +1073,7 @@ function updateGoogleImportScaleInfo() {
   if (!googleMapScaleInfo) return;
   const info = googleImportState.mapContext;
   if (!info) {
-    googleMapScaleInfo.textContent = "Paste a valid Google Maps link above (from your browser address bar).";
+    googleMapScaleInfo.textContent = t("dialog.pasteValidGoogleUrl");
     if (googleMapSizeWarning) {
       googleMapSizeWarning.hidden = true;
       googleMapSizeWarning.textContent = "";
@@ -835,22 +1084,33 @@ function updateGoogleImportScaleInfo() {
   const dims = computeImportDimensionsCm(info.latitude, googleImportState.currentZoom);
   const widthCm = dims.widthCm;
   const heightCm = dims.heightCm;
-  googleMapScaleInfo.textContent = `Detected: Latitude ${info.latitude.toFixed(5)}, Longitude ${info.longitude.toFixed(5)}, Zoom ${Math.round(googleImportState.currentZoom)}. Import size: ${widthCm}x${heightCm} cm.`;
+  googleMapScaleInfo.textContent = t("dialog.detectedImportSize", {
+    latitude: info.latitude.toFixed(5),
+    longitude: info.longitude.toFixed(5),
+    zoom: Math.round(googleImportState.currentZoom),
+    width: widthCm,
+    height: heightCm,
+  });
 
   if (googleMapSizeWarning) {
     const tooLarge = widthCm > MAX_GOOGLE_MAP_CM || heightCm > MAX_GOOGLE_MAP_CM;
     googleMapSizeWarning.hidden = !tooLarge;
     googleMapSizeWarning.textContent = tooLarge
-      ? `Warning: map is too large (${widthCm}x${heightCm} cm). Maximum is ${MAX_GOOGLE_MAP_CM} cm per side. Zoom in to reduce size.`
+      ? t("dialog.mapTooLargeWarning", { width: widthCm, height: heightCm, max: MAX_GOOGLE_MAP_CM })
       : "";
   }
 
   if (googleMapCropInfo) {
     if (googleImportState.selectedImageEl && googleImportState.cropRect) {
       const { width, height } = googleImportState.cropRect;
-      googleMapCropInfo.textContent = `Crop: ${Math.round(width)}x${Math.round(height)} px -> ${widthCm}x${heightCm} cm`;
+      googleMapCropInfo.textContent = t("dialog.cropInfo", {
+        pxWidth: Math.round(width),
+        pxHeight: Math.round(height),
+        width: widthCm,
+        height: heightCm,
+      });
     } else {
-      googleMapCropInfo.textContent = "Drag on the image to crop. Map dimensions update automatically.";
+      googleMapCropInfo.textContent = t("hint.cropDragImage");
     }
   }
 }
@@ -1097,7 +1357,7 @@ async function updateGoogleMapPreview() {
   } catch {
     googleImportState.mapContext = null;
     googleMapPreviewWrap.hidden = true;
-    setGoogleMapDialogMessage("Paste a valid Google Maps URL to load the preview.");
+    setGoogleMapDialogMessage(t("dialog.pasteValidGoogleUrl"));
     updateGoogleImportScaleInfo();
     return;
   }
@@ -1112,20 +1372,20 @@ async function updateGoogleMapPreview() {
     map.setCenter({ lat: info.latitude, lng: info.longitude });
     googleImportState.syncingFromInput = false;
     googleMapPreviewWrap.hidden = false;
-    setGoogleMapDialogMessage("Preview ready. Drag or zoom the map to update the link automatically.", "info");
+    setGoogleMapDialogMessage(t("dialog.previewReady"), "info");
     updateGoogleImportScaleInfo();
   } catch (error) {
     googleImportState.syncingFromInput = false;
     googleImportState.mapContext = null;
     googleMapPreviewWrap.hidden = true;
-    setGoogleMapDialogMessage(error.message || "Unable to load Google Maps preview.");
-    setHint(error.message || "Unable to load Google Maps preview.");
+    setGoogleMapDialogMessage(error.message || t("hint.unableLoadGooglePreview"));
+    setHint(error.message || t("hint.unableLoadGooglePreview"));
   }
 }
 
 function promptForGoogleMapImport() {
   if (!importGoogleMapDialog || !importGoogleMapForm) {
-    setHint("Google map import dialog is unavailable.");
+    setHint(t("hint.googleImportDialogUnavailable"));
     return false;
   }
 
@@ -1150,7 +1410,7 @@ function promptForGoogleMapImport() {
     googleMapImageFileInput.value = "";
   }
   if (googleMapFileNameInfo) {
-    googleMapFileNameInfo.textContent = "No file selected.";
+    googleMapFileNameInfo.textContent = t("dialog.noFileSelected");
   }
   if (googleMapCropWrap) {
     googleMapCropWrap.hidden = true;
@@ -1193,8 +1453,8 @@ function promptForGoogleMapImport() {
     const heightCm = dims.heightCm;
 
     if (!Number.isFinite(widthCm) || !Number.isFinite(heightCm) || widthCm <= 0 || heightCm <= 0) {
-      setGoogleMapDialogMessage("Map dimensions must be greater than 0 cm. Try a different zoom level.");
-      setHint("Map dimensions must be greater than 0 cm. Try a different zoom level.");
+      setGoogleMapDialogMessage(t("hint.mapDimensionsTryZoom"));
+      setHint(t("hint.mapDimensionsTryZoom"));
       return false;
     }
 
@@ -1217,9 +1477,10 @@ function promptForGoogleMapImport() {
     backgroundState.panY = 0;
     clampBackgroundPan();
     renderBackgroundView();
+    window.switchMapObjects?.(CUSTOM_BACKGROUND_KEY, { clearStore: true });
     savePlannerToLocalStorage();
-    setGoogleMapDialogMessage(`Imported satellite map: ${name}.`, "success");
-    setHint(`Imported satellite map: ${name} (${widthCm}x${heightCm} cm).`);
+    setGoogleMapDialogMessage(t("dialog.importedSatelliteMapShort", { name }), "success");
+    setHint(t("hint.importedSatelliteMap", { name, width: widthCm, height: heightCm }));
     closeDialog();
     return true;
   };
@@ -1239,7 +1500,7 @@ function promptForGoogleMapImport() {
       googleMapCropWrap.hidden = true;
     }
     if (googleMapFileNameInfo) {
-      googleMapFileNameInfo.textContent = "No file selected.";
+      googleMapFileNameInfo.textContent = t("dialog.noFileSelected");
     }
     if (googleMapDrawAreaBtn) {
       googleMapDrawAreaBtn.classList.remove("active");
@@ -1251,8 +1512,8 @@ function promptForGoogleMapImport() {
   const handleFileInputChange = async () => {
     const link = String(googleMapLinkInput.value || "").trim();
     if (!link) {
-      setGoogleMapDialogMessage("Please paste a Google Maps link first.");
-      setHint("Please paste a Google Maps link first.");
+      setGoogleMapDialogMessage(t("hint.pasteGoogleLinkFirst"));
+      setHint(t("hint.pasteGoogleLinkFirst"));
       return;
     }
 
@@ -1260,15 +1521,15 @@ function promptForGoogleMapImport() {
     try {
       context = googleImportState.mapContext || parseGoogleMapsContext(link);
     } catch (error) {
-      setGoogleMapDialogMessage(error.message || "Invalid Google Maps link.");
-      setHint(error.message || "Invalid Google Maps link.");
+      setGoogleMapDialogMessage(error.message || t("hint.invalidGoogleMapsLink"));
+      setHint(error.message || t("hint.invalidGoogleMapsLink"));
       return;
     }
 
     const name = String(googleMapNameInput.value || "").trim();
     if (!name) {
-      setGoogleMapDialogMessage("Please provide a map name.");
-      setHint("Please provide a map name.");
+      setGoogleMapDialogMessage(t("hint.provideMapName"));
+      setHint(t("hint.provideMapName"));
       return;
     }
 
@@ -1277,13 +1538,13 @@ function promptForGoogleMapImport() {
       return;
     }
     if (!String(file.type || "").startsWith("image/")) {
-      const msg = "Selected file is not a supported image.";
+      const msg = t("hint.selectedFileNotImage");
       setGoogleMapDialogMessage(msg);
       setHint(msg);
       return;
     }
 
-    setGoogleMapDialogMessage("Loading image file...", "info");
+    setGoogleMapDialogMessage(t("dialog.loadingImageFile"), "info");
     try {
       const imageSource = await readImageFileAsDataUrl(file);
       const imageEl = await loadImageElement(imageSource);
@@ -1304,10 +1565,10 @@ function promptForGoogleMapImport() {
       renderGoogleMapCropCanvas();
       updateGoogleImportScaleInfo();
       if (googleMapFileNameInfo) {
-        googleMapFileNameInfo.textContent = `Selected: ${file.name}`;
+        googleMapFileNameInfo.textContent = t("dialog.selectedFile", { name: file.name });
       }
-      setGoogleMapDialogMessage("Image file loaded. Click Create Map to import.", "success");
-      setHint(`Selected image file: ${file.name}`);
+      setGoogleMapDialogMessage(t("dialog.imageFileLoaded"), "success");
+      setHint(t("hint.selectedImageFile", { name: file.name }));
     } catch (error) {
       const message = error.message || "Unable to import image file.";
       googleImportState.selectedImageSource = "";
@@ -1322,7 +1583,7 @@ function promptForGoogleMapImport() {
         googleMapCropWrap.hidden = true;
       }
       if (googleMapFileNameInfo) {
-        googleMapFileNameInfo.textContent = "No file selected.";
+        googleMapFileNameInfo.textContent = t("dialog.noFileSelected");
       }
       if (googleMapDrawAreaBtn) {
         googleMapDrawAreaBtn.classList.remove("active");
@@ -1337,8 +1598,8 @@ function promptForGoogleMapImport() {
 
     const link = String(googleMapLinkInput.value || "").trim();
     if (!link) {
-      setGoogleMapDialogMessage("Please paste a Google Maps link.");
-      setHint("Please paste a Google Maps link.");
+      setGoogleMapDialogMessage(t("hint.pasteGoogleLink"));
+      setHint(t("hint.pasteGoogleLink"));
       return;
     }
 
@@ -1346,20 +1607,20 @@ function promptForGoogleMapImport() {
     try {
       context = googleImportState.mapContext || parseGoogleMapsContext(link);
     } catch (error) {
-      setGoogleMapDialogMessage(error.message || "Invalid Google Maps link.");
-      setHint(error.message || "Invalid Google Maps link.");
+      setGoogleMapDialogMessage(error.message || t("hint.invalidGoogleMapsLink"));
+      setHint(error.message || t("hint.invalidGoogleMapsLink"));
       return;
     }
 
     const name = String(googleMapNameInput.value || "").trim();
     if (!name) {
-      setGoogleMapDialogMessage("Please provide a map name.");
-      setHint("Please provide a map name.");
+      setGoogleMapDialogMessage(t("hint.provideMapName"));
+      setHint(t("hint.provideMapName"));
       return;
     }
 
     if (!googleImportState.selectedImageSource) {
-      const msg = "Please click Import File and choose an image before creating the map.";
+      const msg = t("hint.importFileBeforeCreate");
       setGoogleMapDialogMessage(msg);
       setHint(msg);
       return;
@@ -1382,7 +1643,7 @@ function promptForGoogleMapImport() {
     if (googleMapDrawAreaBtn) {
       googleMapDrawAreaBtn.classList.toggle("active", googleImportState.drawMode);
     }
-    setHint(googleImportState.drawMode ? "Draw mode enabled: drag freehand on the image to draw a yellow line." : "Draw mode disabled.");
+    setHint(googleImportState.drawMode ? t("hint.drawModeEnabledImage") : t("hint.drawModeDisabled"));
   };
 
   const handleClearDrawArea = () => {
@@ -1455,12 +1716,12 @@ function readImageFileAsDataUrl(file) {
     reader.onload = () => {
       const result = String(reader.result || "");
       if (!result.startsWith("data:image/")) {
-        reject(new Error("Unable to read image data."));
+        reject(new Error(t("error.unableReadImageData")));
         return;
       }
       resolve(result);
     };
-    reader.onerror = () => reject(new Error("Failed to read the selected file."));
+    reader.onerror = () => reject(new Error(t("error.failedReadSelectedFile")));
     reader.readAsDataURL(file);
   });
 }
@@ -1469,7 +1730,7 @@ function loadImageElement(source) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Failed to decode the selected image."));
+    img.onerror = () => reject(new Error(t("error.failedDecodeImage")));
     img.src = source;
   });
 }
@@ -1494,9 +1755,7 @@ async function fetchGoogleMapsSatelliteImage(context) {
   if (loads) return urlString;
 
   // Step 3: Image did not load at all — API key is likely not configured for Maps Static API.
-  throw new Error(
-    "Unable to load the satellite image. Make sure the 'Maps Static API' service is enabled for this API key in Google Cloud Console (console.cloud.google.com → APIs & Services).",
-  );
+  throw new Error(t("error.unableLoadSatelliteImage"));
 }
 
 function tryLoadImageAsDataUrl(imageUrl) {
@@ -1612,10 +1871,12 @@ function renderBackgroundView() {
   roomCanvas.style.setProperty("--bg-pan-x", `${backgroundState.panX}px`);
   roomCanvas.style.setProperty("--bg-pan-y", `${backgroundState.panY}px`);
   sizeBackgroundImg();
+  renderBackgroundGrid();
 
   const zoomPercent = Math.round(backgroundState.zoom * 100);
   backgroundZoom.value = String(zoomPercent);
-  backgroundZoomValue.textContent = `${zoomPercent}%`;
+  const zoomValueEl = document.getElementById("backgroundZoomValue");
+  if (zoomValueEl) zoomValueEl.textContent = `${zoomPercent}%`;
 
   roomCanvas.classList.toggle("bg-move-mode", backgroundState.moveMode);
   syncBackgroundSelectTitle();
