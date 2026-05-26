@@ -142,6 +142,7 @@ const I18N = {
 
     "dialog.pasteValidGoogleUrl": "Paste a valid Google Maps URL to load the preview.",
     "dialog.previewReady": "Preview ready. Drag or zoom the map to update the link automatically.",
+    "dialog.useSnippingToolOnPreview": "Preview ready. Use a snipping tool to capture the map image shown above, then click Import File.",
     "dialog.noFileSelected": "No file selected.",
     "dialog.selectedFile": "Selected: {name}",
     "dialog.loadingImageFile": "Loading image file...",
@@ -305,6 +306,7 @@ const I18N = {
 
     "dialog.pasteValidGoogleUrl": "有効なGoogleマップURLを貼り付けてプレビューを読み込んでください。",
     "dialog.previewReady": "プレビューの準備ができました。リンクを自動更新するにはマップをドラッグまたはズームしてください。",
+    "dialog.useSnippingToolOnPreview": "プレビューの準備ができました。上のマップ画像をスニッピングツールで切り取り、「ファイルを読み込み」をクリックしてください。",
     "dialog.noFileSelected": "ファイルが選択されていません。",
     "dialog.selectedFile": "選択済み: {name}",
     "dialog.loadingImageFile": "画像ファイルを読み込み中...",

@@ -190,35 +190,37 @@
 
         <label for="googleMapLinkInput">Google Maps Link</label>
         <input id="googleMapLinkInput" type="text" placeholder="https://maps.google.com/..." />
-
-        <div id="googleMapPreviewWrap" class="import-map-preview" hidden>
-            <div id="googleMapPreviewMap" class="import-map-preview-map" aria-label="Google map preview"></div>
-        </div>
-
-        <p id="googleMapScaleInfo" class="import-map-info">Paste a Google Maps link to load the satellite image.</p>
-        <p id="googleMapSizeWarning" class="import-map-warning" hidden></p>
         <p id="googleMapDialogMessage" class="dialog-message" hidden aria-live="polite"></p>
-        <input id="googleMapImageFileInput" type="file" accept="image/*" hidden />
 
-        <div class="import-map-file-row">
-          <button id="importGoogleMapFileBtn" type="button">Import File</button>
-          <p id="googleMapFileNameInfo" class="import-map-file-name">No file selected.</p>
-        </div>
-
-        <div id="googleMapCropWrap" class="import-map-crop" hidden>
-          <canvas id="googleMapCropCanvas" class="import-map-canvas" width="560" height="320" aria-label="Image crop preview"></canvas>
-          <div class="import-map-crop-actions">
-            <p id="googleMapCropInfo" class="import-map-file-name">Drag on the image to crop. Map dimensions update automatically.</p>
-            <button id="googleMapResetCropBtn" type="button">Reset Crop</button>
+        <div id="googleMapPostLinkSection" hidden>
+          <div id="googleMapPreviewWrap" class="import-map-preview" hidden>
+              <div id="googleMapPreviewMap" class="import-map-preview-map" aria-label="Google map preview"></div>
           </div>
-        </div>
 
-        <label for="googleMapNameInput">Map Name</label>
-        <input id="googleMapNameInput" type="text" maxlength="60" placeholder="Imported Satellite Map" required />
+          <p id="googleMapScaleInfo" class="import-map-info">Paste a Google Maps link to load the satellite image.</p>
+          <p id="googleMapSizeWarning" class="import-map-warning" hidden></p>
+          <input id="googleMapImageFileInput" type="file" accept="image/*" hidden />
+
+          <div class="import-map-file-row">
+            <button id="importGoogleMapFileBtn" type="button">Import File</button>
+            <p id="googleMapFileNameInfo" class="import-map-file-name">No file selected.</p>
+          </div>
+
+          <div id="googleMapCropWrap" class="import-map-crop" hidden>
+            <canvas id="googleMapCropCanvas" class="import-map-canvas" width="560" height="320" aria-label="Image crop preview"></canvas>
+            <div class="import-map-crop-actions">
+              <p id="googleMapCropInfo" class="import-map-file-name">Drag on the image to crop. Map dimensions update automatically.</p>
+              <button id="googleMapResetCropBtn" type="button">Reset Crop</button>
+            </div>
+          </div>
+
+          <label for="googleMapNameInput">Map Name</label>
+          <input id="googleMapNameInput" type="text" maxlength="60" placeholder="Imported Satellite Map" required />
+        </div>
 
         <div class="new-map-actions">
           <button id="importGoogleMapCancelBtn" type="button">Cancel</button>
-          <button id="importGoogleMapCreateBtn" type="submit">Create Map</button>
+          <button id="importGoogleMapCreateBtn" type="submit" hidden>Create Map</button>
         </div>
       </form>
     </dialog>

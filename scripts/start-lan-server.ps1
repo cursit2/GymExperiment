@@ -17,12 +17,13 @@ function Ensure-FirewallRule {
       -DisplayName $RuleName `
       -Direction Inbound `
       -Action Allow `
-      -Profile Private `
+      -Profile Public,Private `
       -Protocol TCP `
       -LocalPort $RulePort | Out-Null
-    Write-Host "Created firewall rule: $RuleName (TCP $RulePort, Private profile)"
+    Write-Host "Created firewall rule: $RuleName (TCP $RulePort, Public+Private profiles)"
   } else {
-    Write-Host "Firewall rule already exists: $RuleName"
+    Set-NetFirewallRule -DisplayName $RuleName -Profile Public,Private | Out-Null
+    Write-Host "Updated firewall rule profiles to Public+Private: $RuleName"
   }
 }
 

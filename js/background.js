@@ -15,6 +15,7 @@ const newMapCancelBtn = document.getElementById("newMapCancelBtn");
 const importGoogleMapDialog = document.getElementById("importGoogleMapDialog");
 const importGoogleMapForm = document.getElementById("importGoogleMapForm");
 const googleMapLinkInput = document.getElementById("googleMapLinkInput");
+const googleMapPostLinkSection = document.getElementById("googleMapPostLinkSection");
 const googleMapPreviewWrap = document.getElementById("googleMapPreviewWrap");
 const googleMapPreviewMap = document.getElementById("googleMapPreviewMap");
 const googleMapScaleInfo = document.getElementById("googleMapScaleInfo");
@@ -31,6 +32,7 @@ const googleMapDrawAreaBtn = document.getElementById("googleMapDrawAreaBtn");
 const googleMapClearAreaBtn = document.getElementById("googleMapClearAreaBtn");
 const importGoogleMapFileBtn = document.getElementById("importGoogleMapFileBtn");
 const importGoogleMapCancelBtn = document.getElementById("importGoogleMapCancelBtn");
+const importGoogleMapCreateBtn = document.getElementById("importGoogleMapCreateBtn");
 const customMapEditor = document.getElementById("customMapEditor");
 const customMapNameInput = document.getElementById("customMapNameInput");
 const customMapWidthInput = document.getElementById("customMapWidthInput");
@@ -1084,13 +1086,7 @@ function updateGoogleImportScaleInfo() {
   const dims = computeImportDimensionsCm(info.latitude, googleImportState.currentZoom);
   const widthCm = dims.widthCm;
   const heightCm = dims.heightCm;
-  googleMapScaleInfo.textContent = t("dialog.detectedImportSize", {
-    latitude: info.latitude.toFixed(5),
-    longitude: info.longitude.toFixed(5),
-    zoom: Math.round(googleImportState.currentZoom),
-    width: widthCm,
-    height: heightCm,
-  });
+  googleMapScaleInfo.textContent = t("dialog.useSnippingToolOnPreview");
 
   if (googleMapSizeWarning) {
     const tooLarge = widthCm > MAX_GOOGLE_MAP_CM || heightCm > MAX_GOOGLE_MAP_CM;
@@ -1112,6 +1108,18 @@ function updateGoogleImportScaleInfo() {
     } else {
       googleMapCropInfo.textContent = t("hint.cropDragImage");
     }
+  }
+}
+
+function setGoogleImportLinkReadyState(isReady) {
+  if (googleMapPostLinkSection) {
+    googleMapPostLinkSection.hidden = !isReady;
+  }
+  if (importGoogleMapCreateBtn) {
+    importGoogleMapCreateBtn.hidden = !isReady;
+  }
+  if (googleMapNameInput) {
+    googleMapNameInput.required = isReady;
   }
 }
 
@@ -1345,6 +1353,7 @@ async function updateGoogleMapPreview() {
   const rawLink = String(googleMapLinkInput.value || "").trim();
   if (!rawLink) {
     googleImportState.mapContext = null;
+    setGoogleImportLinkReadyState(false);
     googleMapPreviewWrap.hidden = true;
     setGoogleMapDialogMessage("");
     updateGoogleImportScaleInfo();
@@ -1356,6 +1365,7 @@ async function updateGoogleMapPreview() {
     info = parseGoogleMapsContext(rawLink);
   } catch {
     googleImportState.mapContext = null;
+    setGoogleImportLinkReadyState(false);
     googleMapPreviewWrap.hidden = true;
     setGoogleMapDialogMessage(t("dialog.pasteValidGoogleUrl"));
     updateGoogleImportScaleInfo();
@@ -1371,12 +1381,14 @@ async function updateGoogleMapPreview() {
     map.setZoom(Math.round(info.zoom));
     map.setCenter({ lat: info.latitude, lng: info.longitude });
     googleImportState.syncingFromInput = false;
+    setGoogleImportLinkReadyState(true);
     googleMapPreviewWrap.hidden = false;
-    setGoogleMapDialogMessage(t("dialog.previewReady"), "info");
+    setGoogleMapDialogMessage(t("dialog.useSnippingToolOnPreview"), "info");
     updateGoogleImportScaleInfo();
   } catch (error) {
     googleImportState.syncingFromInput = false;
     googleImportState.mapContext = null;
+    setGoogleImportLinkReadyState(false);
     googleMapPreviewWrap.hidden = true;
     setGoogleMapDialogMessage(error.message || t("hint.unableLoadGooglePreview"));
     setHint(error.message || t("hint.unableLoadGooglePreview"));
@@ -1415,6 +1427,7 @@ function promptForGoogleMapImport() {
   if (googleMapCropWrap) {
     googleMapCropWrap.hidden = true;
   }
+  setGoogleImportLinkReadyState(false);
   if (googleMapDrawAreaBtn) {
     googleMapDrawAreaBtn.classList.remove("active");
   }
