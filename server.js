@@ -10,6 +10,7 @@ const ROOT      = __dirname;
 const SAVES_DIR = path.join(ROOT, 'saves');
 const LAYOUTS_DIR = path.join(SAVES_DIR, 'layouts');
 const MAPS_INDEX_PATH = path.join(SAVES_DIR, 'maps-index.json');
+const CUSTOM_EQUIPMENT_PATH = path.join(SAVES_DIR, 'custom-equipment.json');
 const ASSETS_DIR = path.join(ROOT, 'assets');
 const MAX_SAVE_BYTES = 50 * 1024 * 1024;
 const BACKGROUND_EXTENSIONS = new Set(['.svg', '.png', '.jpg', '.jpeg', '.webp']);
@@ -23,6 +24,9 @@ if (!fs.existsSync(LAYOUTS_DIR)) {
 }
 if (!fs.existsSync(MAPS_INDEX_PATH)) {
   fs.writeFileSync(MAPS_INDEX_PATH, '[]', 'utf8');
+}
+if (!fs.existsSync(CUSTOM_EQUIPMENT_PATH)) {
+  fs.writeFileSync(CUSTOM_EQUIPMENT_PATH, '[]', 'utf8');
 }
 
 const MIME_TYPES = {
@@ -94,7 +98,19 @@ function normalizeMapsIndex() {
   const maps = readMapsIndex();
   let changed = false;
 
-  const normalized = maps.map((entry) => {
+  const normalized = maps
+    .filter((entry) => {
+      const src = String(entry?.src || '').trim();
+      const saveName = String(entry?.saveName || entry?.id || '').trim();
+      const isCustomEquipmentEntry = saveName === 'custom-equipment';
+      const isValidMapEntry = Boolean(src);
+      if (!isValidMapEntry || isCustomEquipmentEntry) {
+        changed = true;
+        return false;
+      }
+      return true;
+    })
+    .map((entry) => {
     const next = { ...entry };
     const nextLabel = canonicalMapLabel(next);
     if (next.label !== nextLabel) {
@@ -114,6 +130,9 @@ function normalizeMapsIndex() {
 function upsertMapIndexEntryFromState(saveName, parsedState) {
   const background = parsedState?.background || {};
   const src = typeof background.src === 'string' ? background.src : '';
+  if (!src || saveName === 'custom-equipment') {
+    return;
+  }
   const customNameRaw = String(background?.customMap?.name || '').trim();
   const label = customNameRaw
     || canonicalMapLabel({ src, saveName });
@@ -146,6 +165,7 @@ function migrateLegacyRootSaves() {
     const lower = entry.name.toLowerCase();
     if (!lower.endsWith('.json')) return;
     if (entry.name === path.basename(MAPS_INDEX_PATH)) return;
+    if (entry.name === path.basename(CUSTOM_EQUIPMENT_PATH)) return;
 
     const saveName = entry.name.slice(0, -5);
     const legacyPath = path.join(SAVES_DIR, entry.name);
@@ -163,7 +183,19 @@ function migrateLegacyRootSaves() {
   });
 }
 
+function cleanupCustomEquipmentMapArtifacts() {
+  const leakedLayoutPath = path.join(LAYOUTS_DIR, 'custom-equipment.json');
+  if (fs.existsSync(leakedLayoutPath)) {
+    try {
+      fs.unlinkSync(leakedLayoutPath);
+    } catch {
+      // Ignore cleanup failures.
+    }
+  }
+}
+
 migrateLegacyRootSaves();
+cleanupCustomEquipmentMapArtifacts();
 normalizeMapsIndex();
 
 function toTitleCaseLabel(value) {
@@ -269,6 +301,63 @@ const server = http.createServer((req, res) => {
       return json(res, 200, listSavedMaps());
     } catch {
       return json(res, 500, { error: 'Could not list saved maps' });
+    }
+  }
+
+  // --- API: get / save custom equipment catalog ---
+  if (urlPath === '/api/custom-equipment') {
+    if (req.method === 'GET') {
+      fs.readFile(CUSTOM_EQUIPMENT_PATH, 'utf8', (err, raw) => {
+        if (err) return json(res, 500, { error: 'Could not load custom equipment' });
+        try {
+          const parsed = JSON.parse(raw);
+          return json(res, 200, Array.isArray(parsed) ? parsed : []);
+        } catch {
+          return json(res, 200, []);
+        }
+      });
+      return;
+    }
+
+    if (req.method === 'POST') {
+      const chunks = [];
+      let totalBytes = 0;
+
+      req.on('data', (chunk) => {
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_SAVE_BYTES) {
+          json(res, 413, { error: 'Payload too large' });
+          req.destroy();
+          return;
+        }
+        chunks.push(chunk);
+      });
+
+      req.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        let parsed;
+        try {
+          parsed = JSON.parse(body);
+        } catch {
+          return json(res, 400, { error: 'Invalid JSON' });
+        }
+
+        if (!Array.isArray(parsed)) {
+          return json(res, 400, { error: 'Expected an array of custom equipment items' });
+        }
+
+        fs.writeFile(CUSTOM_EQUIPMENT_PATH, JSON.stringify(parsed, null, 2), 'utf8', (err) => {
+          if (err) return json(res, 500, { error: 'Write failed' });
+          return json(res, 200, { ok: true });
+        });
+      });
+
+      req.on('error', () => {
+        if (!res.headersSent) {
+          json(res, 400, { error: 'Request failed' });
+        }
+      });
+      return;
     }
   }
 

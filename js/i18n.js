@@ -15,7 +15,6 @@ const I18N = {
     "tab.map": "Map",
 
     "btn.addEquipment": "Add Equipment Item",
-    "btn.addDivider": "Add Divider",
     "btn.deleteSelected": "Delete Selected",
     "btn.undo": "Undo (Ctrl+Z)",
     "btn.savePlanner": "Save Planner",
@@ -23,8 +22,18 @@ const I18N = {
     "btn.resetBackground": "Reset Background View",
     "btn.showGrid": "Show Grid",
     "btn.hideGrid": "Hide Grid",
+    "btn.mouseModeDrag": "Mouse Mode: Drag",
+    "btn.mouseModeSelect": "Mouse Mode: Select",
+    "btn.addNote": "Add Note",
+    "btn.measureDistance": "Measure Distance",
+    "btn.alignLeft": "Align Left",
+    "btn.alignCenter": "Align Center",
+    "btn.copy": "Copy",
+    "btn.paste": "Paste",
     "btn.newMap": "New Map",
     "btn.importGoogleMap": "Import Google Map",
+    "btn.newPlanner": "New Planner",
+    "btn.deletePlanner": "Delete Planner",
     "btn.drawYellowLine": "Draw Yellow Line",
     "btn.drawYellowFreehand": "Draw Freehand",
     "btn.removeYellowArea": "Remove Yellow Area",
@@ -45,14 +54,18 @@ const I18N = {
     "label.name": "Name",
     "label.item": "Item",
     "label.lengthCm": "Length (cm)",
+    "label.note": "Note",
     "label.googleMapsLink": "Google Maps Link",
+    "label.planner": "Planner",
     "title.newMap": "Create New Map",
     "title.newEquipment": "Add Equipment Item",
+    "title.newNote": "Add Note",
     "title.importGoogleMap": "Import Google Map Satellite Image",
     "placeholder.newMapName": "My Training Room",
     "placeholder.newEquipmentName": "Custom Beam",
     "placeholder.googleMapsLink": "https://maps.google.com/...",
     "placeholder.googleMapName": "Imported Satellite Map",
+    "placeholder.noteText": "Enter note text...",
 
     "option.gymFloor": "Gym Floor (2 Courts)",
     "option.beige": "Beige",
@@ -61,6 +74,7 @@ const I18N = {
     "option.green": "Green",
     "option.tan": "Tan",
     "option.white": "White",
+    "option.defaultPlanner": "Default Planner",
     "equipment.bars": "Bars",
     "equipment.beam": "Beam",
     "equipment.boxVault": "Box Vault",
@@ -80,14 +94,41 @@ const I18N = {
     "hint.selectCustomEquipmentDelete": "Select a custom equipment item to delete.",
     "hint.customEquipmentDeleteCanceled": "Custom equipment delete canceled.",
     "hint.customEquipmentDeleted": "Custom equipment deleted.",
+    "hint.customEquipmentInUseCannotDelete": "Cannot delete custom equipment because it is used in {count} map(s). Remove it from those maps first.",
     "hint.unableDeleteCustomEquipment": "Unable to delete custom equipment.",
     "hint.undoObjectRestored": "Undo: object restored.",
     "hint.objectRemoved": "Object removed.",
-    "hint.dividerRemoved": "Divider removed.",
-    "hint.selectObjectOrDividerDelete": "Select an object or divider to delete.",
+    "hint.selectObjectDelete": "Select an object to delete.",
     "hint.undoRoomRestored": "Undo: room restored.",
     "hint.roomCleared": "Room cleared.",
     "hint.backgroundUpdated": "Background updated.",
+    "hint.newPlannerCreated": "Created planner: {planner}.",
+    "hint.newPlannerBlankLoaded": "Loaded planner: {planner} (blank).",
+    "hint.plannerDeleteCanceled": "Planner deletion canceled.",
+    "hint.plannerDeleted": "Deleted planner: {planner}.",
+    "hint.unableDeletePlanner": "Unable to delete planner.",
+    "hint.dragModeEnabled": "Drag mode enabled.",
+    "hint.selectModeEnabled": "Select mode enabled. Drag to capture multiple objects.",
+    "hint.selectionCaptured": "Selected {count} object(s).",
+    "hint.noteAdded": "Note added.",
+    "hint.noteUpdated": "Note updated.",
+    "hint.noteCanceled": "Adding note canceled.",
+    "hint.noteEmpty": "Note text cannot be empty.",
+    "hint.noteDialogUnavailable": "Note dialog is unavailable.",
+    "hint.measureToolDisabled": "Measurement tool disabled.",
+    "hint.measureFirstPoint": "Measurement tool active. Click the first point.",
+    "hint.measureSecondPoint": "Click the second point to finish measuring.",
+    "hint.measureTooShort": "Measurement canceled because points are too close.",
+    "hint.measureAdded": "Measurement added: {meters} m.",
+    "hint.selectAtLeastTwoAlign": "Select at least two objects to align.",
+    "hint.alignedLeft": "Aligned selected objects to the left edge.",
+    "hint.alignedCenter": "Aligned selected objects to the horizontal center.",
+    "hint.undoAnnotationRemoved": "Undo: annotation removed.",
+    "hint.nothingToCopy": "Select at least one object to copy.",
+    "hint.nothingToPaste": "Nothing to paste. Copy equipment first.",
+    "hint.copiedSelection": "Copied {count} selected object(s).",
+    "hint.pastedSelection": "Pasted {count} object(s).",
+    "hint.undoPastedRemoved": "Undo: pasted objects removed.",
 
     "hint.plannerSavedDisk": "Planner saved to disk.",
     "hint.unableSaveDisk": "Unable to save planner to disk.",
@@ -98,6 +139,7 @@ const I18N = {
 
     "confirm.deleteCustomEquipment": "Delete {name}? This cannot be undone.",
     "confirm.deleteCustomMap": "Delete {name}? This cannot be undone.",
+    "confirm.deletePlanner": "Delete planner {planner}? This cannot be undone.",
 
     "hint.satelliteDisplayFailed": "Satellite image failed to display. Check that 'Maps Static API' is enabled for this API key in Google Cloud Console.",
     "hint.selectImportedMapForDraw": "Select an imported custom map to draw yellow areas.",
@@ -152,6 +194,9 @@ const I18N = {
     "dialog.mapTooLargeWarning": "Warning: map is too large ({width}x{height} cm). Maximum is {max} cm per side. Zoom in to reduce size.",
     "dialog.cropInfo": "Crop: {pxWidth}x{pxHeight} px -> {width}x{height} cm",
 
+    "prompt.noteText": "Enter note text:",
+    "prompt.newPlannerName": "Enter planner name:",
+
     "error.unableReadImageData": "Unable to read image data.",
     "error.failedReadSelectedFile": "Failed to read the selected file.",
     "error.failedDecodeImage": "Failed to decode the selected image.",
@@ -179,7 +224,6 @@ const I18N = {
     "tab.map": "マップ",
 
     "btn.addEquipment": "器具を追加",
-    "btn.addDivider": "仕切りを追加",
     "btn.deleteSelected": "選択を削除",
     "btn.undo": "元に戻す (Ctrl+Z)",
     "btn.savePlanner": "プランを保存",
@@ -187,8 +231,18 @@ const I18N = {
     "btn.resetBackground": "背景表示をリセット",
     "btn.showGrid": "グリッドを表示",
     "btn.hideGrid": "グリッドを非表示",
+    "btn.mouseModeDrag": "マウスモード: ドラッグ",
+    "btn.mouseModeSelect": "マウスモード: 選択",
+    "btn.addNote": "メモを追加",
+    "btn.measureDistance": "距離を計測",
+    "btn.alignLeft": "左揃え",
+    "btn.alignCenter": "中央揃え",
+    "btn.copy": "コピー",
+    "btn.paste": "貼り付け",
     "btn.newMap": "新しいマップ",
     "btn.importGoogleMap": "Googleマップを読み込み",
+    "btn.newPlanner": "新しいプランナー",
+    "btn.deletePlanner": "プランナーを削除",
     "btn.drawYellowLine": "黄色の線を描画",
     "btn.drawYellowFreehand": "フリーハンドで描画",
     "btn.removeYellowArea": "黄色エリアを削除",
@@ -209,14 +263,18 @@ const I18N = {
     "label.name": "名前",
     "label.item": "項目",
     "label.lengthCm": "長さ (cm)",
+    "label.note": "メモ",
     "label.googleMapsLink": "Googleマップのリンク",
+    "label.planner": "プランナー",
     "title.newMap": "新しいマップを作成",
     "title.newEquipment": "器具項目を追加",
+    "title.newNote": "メモを追加",
     "title.importGoogleMap": "Googleマップ衛星画像を読み込み",
     "placeholder.newMapName": "練習ルーム",
     "placeholder.newEquipmentName": "カスタム平均台",
     "placeholder.googleMapsLink": "https://maps.google.com/...",
     "placeholder.googleMapName": "読み込み済み衛星マップ",
+    "placeholder.noteText": "メモを入力してください...",
 
     "option.gymFloor": "体育館（2コート）",
     "option.beige": "ベージュ",
@@ -225,6 +283,7 @@ const I18N = {
     "option.green": "緑",
     "option.tan": "タン",
     "option.white": "白",
+    "option.defaultPlanner": "デフォルトプランナー",
     "equipment.bars": "段違い平行棒",
     "equipment.beam": "平均台",
     "equipment.boxVault": "跳び箱",
@@ -244,14 +303,41 @@ const I18N = {
     "hint.selectCustomEquipmentDelete": "削除するカスタム器具を選択してください。",
     "hint.customEquipmentDeleteCanceled": "カスタム器具の削除をキャンセルしました。",
     "hint.customEquipmentDeleted": "カスタム器具を削除しました。",
+    "hint.customEquipmentInUseCannotDelete": "このカスタム器具は {count} 個のマップで使用されているため削除できません。先にそれらのマップから削除してください。",
     "hint.unableDeleteCustomEquipment": "カスタム器具を削除できませんでした。",
     "hint.undoObjectRestored": "元に戻す: オブジェクトを復元しました。",
     "hint.objectRemoved": "オブジェクトを削除しました。",
-    "hint.dividerRemoved": "仕切りを削除しました。",
-    "hint.selectObjectOrDividerDelete": "削除するオブジェクトまたは仕切りを選択してください。",
+    "hint.selectObjectDelete": "削除するオブジェクトを選択してください。",
     "hint.undoRoomRestored": "元に戻す: 部屋を復元しました。",
     "hint.roomCleared": "部屋をクリアしました。",
     "hint.backgroundUpdated": "背景を更新しました。",
+    "hint.newPlannerCreated": "プランナーを作成しました: {planner}。",
+    "hint.newPlannerBlankLoaded": "プランナーを読み込みました: {planner}（空）。",
+    "hint.plannerDeleteCanceled": "プランナーの削除をキャンセルしました。",
+    "hint.plannerDeleted": "プランナーを削除しました: {planner}。",
+    "hint.unableDeletePlanner": "プランナーを削除できませんでした。",
+    "hint.dragModeEnabled": "ドラッグモードを有効化しました。",
+    "hint.selectModeEnabled": "選択モードを有効化しました。ドラッグして複数オブジェクトを選択できます。",
+    "hint.selectionCaptured": "{count} 個のオブジェクトを選択しました。",
+    "hint.noteAdded": "メモを追加しました。",
+    "hint.noteUpdated": "メモを更新しました。",
+    "hint.noteCanceled": "メモ追加をキャンセルしました。",
+    "hint.noteEmpty": "メモのテキストは空にできません。",
+    "hint.noteDialogUnavailable": "メモダイアログを使用できません。",
+    "hint.measureToolDisabled": "計測ツールを無効化しました。",
+    "hint.measureFirstPoint": "計測ツールを有効化しました。1点目をクリックしてください。",
+    "hint.measureSecondPoint": "2点目をクリックして計測を完了してください。",
+    "hint.measureTooShort": "点が近すぎるため計測をキャンセルしました。",
+    "hint.measureAdded": "計測を追加しました: {meters} m。",
+    "hint.selectAtLeastTwoAlign": "整列するには2つ以上のオブジェクトを選択してください。",
+    "hint.alignedLeft": "選択オブジェクトを左端に揃えました。",
+    "hint.alignedCenter": "選択オブジェクトを中央に揃えました。",
+    "hint.undoAnnotationRemoved": "元に戻す: 注釈を削除しました。",
+    "hint.nothingToCopy": "コピーするには1つ以上のオブジェクトを選択してください。",
+    "hint.nothingToPaste": "貼り付ける内容がありません。先に器具をコピーしてください。",
+    "hint.copiedSelection": "{count} 個の選択オブジェクトをコピーしました。",
+    "hint.pastedSelection": "{count} 個のオブジェクトを貼り付けました。",
+    "hint.undoPastedRemoved": "元に戻す: 貼り付けたオブジェクトを削除しました。",
 
     "hint.plannerSavedDisk": "プランをディスクに保存しました。",
     "hint.unableSaveDisk": "プランをディスクに保存できませんでした。",
@@ -262,6 +348,7 @@ const I18N = {
 
     "confirm.deleteCustomEquipment": "{name}を削除しますか？この操作は元に戻せません。",
     "confirm.deleteCustomMap": "{name}を削除しますか？この操作は元に戻せません。",
+    "confirm.deletePlanner": "プランナー {planner} を削除しますか？この操作は元に戻せません。",
 
     "hint.satelliteDisplayFailed": "衛星画像を表示できませんでした。Google Cloud ConsoleでこのAPIキーの「Maps Static API」が有効か確認してください。",
     "hint.selectImportedMapForDraw": "黄色エリアを描画するには、読み込み済みのカスタムマップを選択してください。",
@@ -315,6 +402,9 @@ const I18N = {
     "dialog.detectedImportSize": "検出: 緯度 {latitude}、経度 {longitude}、ズーム {zoom}。取り込みサイズ: {width}x{height} cm。",
     "dialog.mapTooLargeWarning": "警告: マップが大きすぎます（{width}x{height} cm）。1辺あたりの最大は {max} cm です。サイズを小さくするにはズームインしてください。",
     "dialog.cropInfo": "切り抜き: {pxWidth}x{pxHeight} px -> {width}x{height} cm",
+
+    "prompt.noteText": "メモのテキストを入力してください:",
+    "prompt.newPlannerName": "プランナー名を入力してください:",
 
     "error.unableReadImageData": "画像データを読み取れません。",
     "error.failedReadSelectedFile": "選択したファイルを読み取れませんでした。",
@@ -392,15 +482,23 @@ function applyI18n() {
   setText("#mapTabBtn", "tab.map");
 
   setText("#addEquipmentBtn", "btn.addEquipment");
-  setText("#dividerBtn", "btn.addDivider");
+  setText("#addNoteBtn", "btn.addNote");
+  setText("#measureToolBtn", "btn.measureDistance");
+  setText("#alignLeftBtn", "btn.alignLeft");
+  setText("#alignCenterBtn", "btn.alignCenter");
+  setText("#copySelectionBtn", "btn.copy");
+  setText("#pasteSelectionBtn", "btn.paste");
   setText("#deleteBtn", "btn.deleteSelected");
   setText("#undoBtn", "btn.undo");
   setText("#savePlannerBtn", "btn.savePlanner");
   setText("#clearBtn", "btn.clearRoom");
   setText("#resetBackgroundBtn", "btn.resetBackground");
   if (typeof syncToggleGridBtn === "function") syncToggleGridBtn();
+  if (typeof syncMouseModeBtn === "function") syncMouseModeBtn();
   setText("#newMapBtn", "btn.newMap");
   setText("#importGoogleMapBtn", "btn.importGoogleMap");
+  setText("#newPlannerBtn", "btn.newPlanner");
+  setText("#deletePlannerBtn", "btn.deletePlanner");
   setText("#customMapDrawLineBtn", "btn.drawYellowLine");
   setText("#customMapDrawFreehandBtn", "btn.drawYellowFreehand");
   setText("#customMapClearAreaBtn", "btn.removeYellowArea");
@@ -408,17 +506,21 @@ function applyI18n() {
   setText("#deleteCustomEquipmentBtn", "btn.deleteCustomEquipment");
   setText("#newMapDialogTitle", "title.newMap");
   setText("#newEquipmentDialogTitle", "title.newEquipment");
+  setText("#newNoteDialogTitle", "title.newNote");
   setText("#importGoogleMapDialogTitle", "title.importGoogleMap");
   setText("#newMapCancelBtn", "btn.cancel");
   setText("#newMapCreateBtn", "btn.createMap");
   setText("#newEquipmentCancelBtn", "btn.cancel");
   setText("#newEquipmentCreateBtn", "btn.addItem");
+  setText("#newNoteCancelBtn", "btn.cancel");
+  setText("#newNoteCreateBtn", "btn.addNote");
   setText("#importGoogleMapFileBtn", "btn.importFile");
   setText("#googleMapResetCropBtn", "btn.resetCrop");
   setText("#importGoogleMapCancelBtn", "btn.cancel");
   setText("#importGoogleMapCreateBtn", "btn.createMap");
 
   setLabel("backgroundSelect", "label.background");
+  setLabel("plannerSelect", "label.planner");
   setBackgroundZoomLabel();
   setLabel("customMapNameInput", "label.name");
   setLabel("customMapWidthInput", "label.widthCm");
@@ -437,6 +539,8 @@ function applyI18n() {
   setLabel("newEquipmentLengthInput", "label.lengthCm");
   setLabel("newEquipmentWidthInput", "label.widthCm");
   setLabel("newEquipmentColorInput", "label.color");
+  setLabel("newNoteTextInput", "label.note");
+  setLabel("newNoteColorInput", "label.color");
   setLabel("googleMapLinkInput", "label.googleMapsLink");
   setLabel("googleMapNameInput", "label.mapName");
   const newMapNameInput = document.getElementById("newMapNameInput");
@@ -447,6 +551,8 @@ function applyI18n() {
   if (googleMapLinkInput) googleMapLinkInput.placeholder = t("placeholder.googleMapsLink");
   const googleMapNameInput = document.getElementById("googleMapNameInput");
   if (googleMapNameInput) googleMapNameInput.placeholder = t("placeholder.googleMapName");
+  const newNoteTextInput = document.getElementById("newNoteTextInput");
+  if (newNoteTextInput) newNoteTextInput.placeholder = t("placeholder.noteText");
 
   setOption("backgroundSelect", "assets/gym-floor-topdown-4000x7000cm.svg", "option.gymFloor");
   setOption("customMapColorSelect", "Beige", "option.beige");
@@ -461,6 +567,7 @@ function applyI18n() {
   setOption("newMapColorSelect", "Green", "option.green");
   setOption("newMapColorSelect", "Tan", "option.tan");
   setOption("newMapColorSelect", "White", "option.white");
+  setOption("plannerSelect", "default", "option.defaultPlanner");
 
   setText('.palette-item[data-type="bars"]', "equipment.bars");
   setText('.palette-item[data-type="beam"]', "equipment.beam");

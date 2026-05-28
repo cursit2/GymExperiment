@@ -584,11 +584,7 @@ function beginSidebarAnnotationDraw(event) {
   const isCustomMap = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
     && customBackgroundConfig;
   if (!sidebarDrawState.enabled || !isCustomMap) return;
-  if (
-    event.target.closest(".room-object") ||
-    event.target.closest(".room-divider") ||
-    event.target.closest(".divider-rotate-anchor")
-  ) {
+  if (event.target.closest(".room-object")) {
     return;
   }
 
@@ -1748,59 +1744,6 @@ function loadImageElement(source) {
   });
 }
 
-async function fetchGoogleMapsSatelliteImage(context) {
-  const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
-  url.searchParams.set("center", `${context.latitude},${context.longitude}`);
-  url.searchParams.set("zoom", String(Math.round(context.zoom)));
-  url.searchParams.set("size", `${GOOGLE_STATIC_MAP_SIZE}x${GOOGLE_STATIC_MAP_SIZE}`);
-  url.searchParams.set("maptype", "satellite");
-  url.searchParams.set("format", "png");
-  url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
-  const urlString = url.toString();
-
-  // Step 1: Try to convert to a self-contained data URL via canvas.
-  // This works when the Static Maps API sends CORS headers, giving an offline-safe result.
-  const dataUrl = await tryLoadImageAsDataUrl(urlString);
-  if (dataUrl) return dataUrl;
-
-  // Step 2: CORS blocked canvas export. Verify the URL at least loads as an <img> source.
-  const loads = await verifyImageUrlLoads(urlString);
-  if (loads) return urlString;
-
-  // Step 3: Image did not load at all — API key is likely not configured for Maps Static API.
-  throw new Error(t("error.unableLoadSatelliteImage"));
-}
-
-function tryLoadImageAsDataUrl(imageUrl) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth || GOOGLE_STATIC_MAP_SIZE;
-        canvas.height = img.naturalHeight || GOOGLE_STATIC_MAP_SIZE;
-        canvas.getContext("2d").drawImage(img, 0, 0);
-        resolve(canvas.toDataURL("image/png"));
-      } catch {
-        // Canvas tainted — CORS headers not present; resolve null to try URL fallback.
-        resolve(null);
-      }
-    };
-    img.onerror = () => resolve(null); // CORS-mode request rejected; try non-CORS next.
-    img.src = imageUrl;
-  });
-}
-
-function verifyImageUrlLoads(imageUrl) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = imageUrl;
-  });
-}
-
 window.registerCustomImageMap = registerCustomImageMap;
 window.promptForGoogleMapImport = promptForGoogleMapImport;
 
@@ -1894,9 +1837,6 @@ function renderBackgroundView() {
   roomCanvas.classList.toggle("bg-move-mode", backgroundState.moveMode);
   syncBackgroundSelectTitle();
   renderSidebarMapAnnotations();
-
-  // Defined in dividers.js and rulers.js — resolved at call time.
-  renderAllDividers();
   renderRulers();
 }
 
@@ -1914,24 +1854,6 @@ function clientToSceneCoords(clientX, clientY) {
   return {
     x: (clientX - cx) / backgroundState.zoom,
     y: (clientY - cy) / backgroundState.zoom,
-  };
-}
-
-function sceneToCanvasCoords(x, y) {
-  return {
-    x: roomCanvas.clientWidth  / 2 + backgroundState.panX + x * backgroundState.zoom,
-    y: roomCanvas.clientHeight / 2 + backgroundState.panY + y * backgroundState.zoom,
-  };
-}
-
-function getVisibleSceneBounds() {
-  const halfWidth  = roomCanvas.clientWidth  / 2;
-  const halfHeight = roomCanvas.clientHeight / 2;
-  return {
-    minX: (-halfWidth  - backgroundState.panX) / backgroundState.zoom,
-    maxX: ( halfWidth  - backgroundState.panX) / backgroundState.zoom,
-    minY: (-halfHeight - backgroundState.panY) / backgroundState.zoom,
-    maxY: ( halfHeight - backgroundState.panY) / backgroundState.zoom,
   };
 }
 

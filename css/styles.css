@@ -259,6 +259,26 @@ body {
   min-width: 0;
 }
 
+.controls button[data-active="true"] {
+  background: #d2ecef;
+  border-color: #2d666f;
+  color: #16363c;
+}
+
+#actionsTabPanel .controls {
+  gap: 0.8rem;
+}
+
+#actionsTabPanel .action-group {
+  display: grid;
+  gap: 0.6rem;
+}
+
+#actionsTabPanel .action-group + .action-group {
+  border-top: 1px solid rgba(36, 52, 59, 0.24);
+  padding-top: 0.75rem;
+}
+
 #savePlannerBtn {
   background: #cfeebd;
   border-color: #6e9a5a;
@@ -353,6 +373,18 @@ body {
   outline-offset: -8px;
 }
 
+.selection-marquee {
+  position: absolute;
+  border: 1px dashed #1f6a74;
+  background: rgba(31, 106, 116, 0.14);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.selection-marquee[hidden] {
+  display: none;
+}
+
 .new-map-dialog {
   border: 2px solid #33444d;
   border-radius: 14px;
@@ -391,6 +423,17 @@ body {
   background: #f1f5f7;
   color: var(--ink);
   font-size: 0.95rem;
+}
+
+.new-map-form textarea {
+  border: 1px solid #24343b;
+  border-radius: 10px;
+  padding: 0.55rem 0.6rem;
+  background: #f1f5f7;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
 }
 
 .new-map-form input[type="color"] {
