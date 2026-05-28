@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Room Planner</title>
     <link rel="stylesheet" href="css/styles.css" />
-    <link rel="stylesheet" href="css/dividers.css" />
     <link rel="stylesheet" href="css/objects.css" />
     <link rel="stylesheet" href="css/rulers.css" />
   </head>
@@ -73,11 +72,29 @@
 
         <section id="actionsTabPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="actionsTabBtn" hidden>
           <section class="controls" aria-label="Scene controls">
-            <button id="toggleGridBtn" type="button">Hide Grid</button>
-            <button id="deleteBtn" type="button">Delete Selected</button>
-            <button id="undoBtn" type="button">Undo (Ctrl+Z)</button>
-            <button id="savePlannerBtn" type="button">Save Planner</button>
-            <button id="clearBtn" type="button" class="danger">Clear Room</button>
+            <div class="action-group">
+              <button id="savePlannerBtn" type="button">Save Planner</button>
+              <button id="toggleGridBtn" type="button">Hide Grid</button>
+              <button id="addNoteBtn" type="button">Add Note</button>
+              <button id="suggestPlannerBtn" type="button">Suggest Planner</button>
+            </div>
+
+            <div class="action-group">
+              <button id="toggleMouseModeBtn" type="button">Mouse Mode: Drag</button>
+              <button id="measureToolBtn" type="button">Measure Distance</button>
+              <button id="alignLeftBtn" type="button">Align Left</button>
+              <button id="alignCenterBtn" type="button">Align Center</button>
+              <button id="rotateCWBtn" type="button">Rotate 90° CW</button>
+              <button id="rotateCCWBtn" type="button">Rotate 90° CCW</button>
+              <button id="copySelectionBtn" type="button">Copy</button>
+              <button id="pasteSelectionBtn" type="button">Paste</button>
+              <button id="deleteBtn" type="button">Delete Selected</button>
+              <button id="undoBtn" type="button">Undo (Ctrl+Z)</button>
+            </div>
+
+            <div class="action-group action-group-danger">
+              <button id="clearBtn" type="button" class="danger">Clear Room</button>
+            </div>
           </section>
         </section>
 
@@ -87,6 +104,12 @@
             <select id="backgroundSelect" aria-label="Choose floor background">
               <option value="assets/gym-floor-topdown-4000x7000cm.svg" selected>Gym Floor (2 Courts)</option>
             </select>
+            <label for="plannerSelect">Planner</label>
+            <select id="plannerSelect" aria-label="Choose planner layout">
+              <option value="default">Default Planner</option>
+            </select>
+            <button id="newPlannerBtn" type="button">New Planner</button>
+            <button id="deletePlannerBtn" type="button" class="danger">Delete Planner</button>
             <label for="backgroundZoom">Background Zoom <span id="backgroundZoomValue">100%</span></label>
             <input id="backgroundZoom" type="range" min="5" max="300" value="100" step="1" aria-label="Zoom background" />
             <button id="resetBackgroundBtn" type="button">Reset Background View</button>
@@ -105,14 +128,15 @@
             <label for="customMapHeightInput">Height (cm)</label>
             <input id="customMapHeightInput" type="number" min="1" step="1" />
 
-            <label for="customMapColorSelect">Color</label>
-            <select id="customMapColorSelect">
-              <option value="Beige">Beige</option>
-              <option value="Gray">Gray</option>
-              <option value="Blue">Blue</option>
-              <option value="Green">Green</option>
-              <option value="Tan">Tan</option>
-              <option value="White">White</option>
+            <label for="customMapTextureSelect">Texture</label>
+            <select id="customMapTextureSelect">
+              <option value="indoorGym">Indoor Gym</option>
+              <option value="concrete">Concrete</option>
+              <option value="woodDeck">Wood Deck</option>
+              <option value="stoneBrick">Stone / Brick</option>
+              <option value="grass">Grass</option>
+              <option value="dirtGravel">Dirt / Gravel</option>
+              <option value="asphalt">Asphalt</option>
             </select>
 
             <div class="custom-map-area-actions">
@@ -145,14 +169,15 @@
         <label for="newMapHeightInput">Height (cm)</label>
         <input id="newMapHeightInput" type="number" min="1" step="1" required />
 
-        <label for="newMapColorSelect">Color</label>
-        <select id="newMapColorSelect">
-          <option value="Beige">Beige</option>
-          <option value="Gray">Gray</option>
-          <option value="Blue">Blue</option>
-          <option value="Green">Green</option>
-          <option value="Tan">Tan</option>
-          <option value="White">White</option>
+        <label for="newMapTextureSelect">Texture</label>
+        <select id="newMapTextureSelect">
+          <option value="indoorGym">Indoor Gym</option>
+          <option value="concrete">Concrete</option>
+          <option value="woodDeck">Wood Deck</option>
+          <option value="stoneBrick">Stone / Brick</option>
+          <option value="grass">Grass</option>
+          <option value="dirtGravel">Dirt / Gravel</option>
+          <option value="asphalt">Asphalt</option>
         </select>
 
         <div class="new-map-actions">
@@ -180,6 +205,48 @@
         <div class="new-map-actions">
           <button id="newEquipmentCancelBtn" type="button">Cancel</button>
           <button id="newEquipmentCreateBtn" type="submit">Add Item</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="newNoteDialog" class="new-map-dialog" aria-labelledby="newNoteDialogTitle">
+      <form id="newNoteForm" class="new-map-form" novalidate>
+        <h2 id="newNoteDialogTitle">Add Note</h2>
+        <label for="newNoteTextInput">Note</label>
+        <textarea id="newNoteTextInput" rows="4" maxlength="600" placeholder="Enter note text..."></textarea>
+
+        <label for="newNoteColorInput">Color</label>
+        <input id="newNoteColorInput" type="color" value="#fff5bf" />
+
+        <div class="new-map-actions">
+          <button id="newNoteCancelBtn" type="button">Cancel</button>
+          <button id="newNoteCreateBtn" type="submit">Add Note</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="suggestPlannerDialog" class="new-map-dialog" aria-labelledby="suggestPlannerDialogTitle">
+      <form id="suggestPlannerForm" class="new-map-form" novalidate>
+        <h2 id="suggestPlannerDialogTitle">Suggest Planner</h2>
+
+        <label for="suggestBarsCountInput">Bars</label>
+        <input id="suggestBarsCountInput" type="number" min="0" max="30" step="1" value="0" />
+
+        <label for="suggestBeamCountInput">Beam</label>
+        <input id="suggestBeamCountInput" type="number" min="0" max="30" step="1" value="0" />
+
+        <label for="suggestBoxVaultCountInput">Box Vault</label>
+        <input id="suggestBoxVaultCountInput" type="number" min="0" max="30" step="1" value="0" />
+
+        <label for="suggestFloorCountInput">Floor</label>
+        <input id="suggestFloorCountInput" type="number" min="0" max="30" step="1" value="0" />
+
+        <label for="suggestVaultCountInput">Vault</label>
+        <input id="suggestVaultCountInput" type="number" min="0" max="30" step="1" value="0" />
+
+        <div class="new-map-actions">
+          <button id="suggestPlannerCancelBtn" type="button">Cancel</button>
+          <button id="suggestPlannerCreateBtn" type="submit">Suggest Planner</button>
         </div>
       </form>
     </dialog>
@@ -230,8 +297,8 @@
     <script src="js/history.js"></script>
     <script src="js/background.js"></script>
     <script src="js/rulers.js"></script>
-    <script src="js/dividers.js"></script>
     <script src="js/room-objects.js"></script>
+    <script src="js/planner-schema.js"></script>
     <script src="js/persistence.js"></script>
     <script src="js/app.js"></script>
   </body>

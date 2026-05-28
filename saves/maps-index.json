@@ -1,33 +1,32 @@
 [
   {
-    "id": "map_custom-map_custom_map",
-    "saveName": "map_custom-map_custom_map",
+    "id": "map_custom-map_custom_map__planner_default",
+    "saveName": "map_custom-map_custom_map__planner_default",
     "label": "Custom Map",
     "src": "custom-map",
-    "updatedAt": "2026-05-26T00:58:58.688Z",
+    "updatedAt": "2026-06-02T01:01:55.176Z",
     "customMap": {
       "name": "Custom Map",
       "width": 4000,
       "height": 7000,
-      "colorName": "Green",
-      "colorHex": "#d2e5d2",
+      "textureName": "indoorGym",
       "mapMeta": null
     }
   },
   {
-    "id": "map_assets_gym-floor-topdown-4000x7000cm_svg",
-    "saveName": "map_assets_gym-floor-topdown-4000x7000cm_svg",
+    "id": "map_assets_gym-floor-topdown-4000x7000cm_svg__planner_default",
+    "saveName": "map_assets_gym-floor-topdown-4000x7000cm_svg__planner_default",
     "label": "Gym Floor (2 Courts)",
     "src": "assets/gym-floor-topdown-4000x7000cm.svg",
-    "updatedAt": "2026-05-25T03:54:30.164Z",
+    "updatedAt": "2026-06-02T00:58:09.308Z",
     "customMap": null
   },
   {
-    "id": "map_custom-map_ganke_fes",
-    "saveName": "map_custom-map_ganke_fes",
+    "id": "map_custom-map_ganke_fes__planner_default",
+    "saveName": "map_custom-map_ganke_fes__planner_default",
     "label": "ganke fes",
     "src": "custom-map",
-    "updatedAt": "2026-05-21T04:07:39.549Z",
+    "updatedAt": "2026-06-02T00:35:15.647Z",
     "customMap": {
       "name": "ganke fes",
       "width": 6214,

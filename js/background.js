@@ -10,7 +10,7 @@ const newMapForm = document.getElementById("newMapForm");
 const newMapNameInput = document.getElementById("newMapNameInput");
 const newMapWidthInput = document.getElementById("newMapWidthInput");
 const newMapHeightInput = document.getElementById("newMapHeightInput");
-const newMapColorSelect = document.getElementById("newMapColorSelect");
+const newMapTextureSelect = document.getElementById("newMapTextureSelect");
 const newMapCancelBtn = document.getElementById("newMapCancelBtn");
 const importGoogleMapDialog = document.getElementById("importGoogleMapDialog");
 const importGoogleMapForm = document.getElementById("importGoogleMapForm");
@@ -37,7 +37,7 @@ const customMapEditor = document.getElementById("customMapEditor");
 const customMapNameInput = document.getElementById("customMapNameInput");
 const customMapWidthInput = document.getElementById("customMapWidthInput");
 const customMapHeightInput = document.getElementById("customMapHeightInput");
-const customMapColorSelect = document.getElementById("customMapColorSelect");
+const customMapTextureSelect = document.getElementById("customMapTextureSelect");
 const customMapDrawLineBtn = document.getElementById("customMapDrawLineBtn");
 const customMapDrawFreehandBtn = document.getElementById("customMapDrawFreehandBtn");
 const customMapClearAreaBtn = document.getElementById("customMapClearAreaBtn");
@@ -65,13 +65,23 @@ const backgroundSources = {
 const discoveredBackgroundLabels = {};
 
 const CUSTOM_BACKGROUND_KEY = "custom-map";
-const BASIC_MAP_COLORS = {
-  Beige: "#e8dfcf",
-  Gray: "#d5d9de",
-  Blue: "#cfe1ea",
-  Green: "#d2e5d2",
-  Tan: "#dcc8ab",
-  White: "#f5f5f0",
+const BASIC_MAP_TEXTURES = {
+  indoorGym: { base: "#e6dfd1", accent: "#cbbfa9", detail: "#8f7f68", labelKey: "option.indoorGym" },
+  concrete: { base: "#d7dde2", accent: "#b6bec7", detail: "#7f8a94", labelKey: "option.concrete" },
+  woodDeck: { base: "#d8b58a", accent: "#bf9263", detail: "#8b5f39", labelKey: "option.woodDeck" },
+  stoneBrick: { base: "#d9d6d0", accent: "#b5ada3", detail: "#857b70", labelKey: "option.stoneBrick" },
+  grass: { base: "#cfe3c3", accent: "#a8c98e", detail: "#6f9e57", labelKey: "option.grass" },
+  dirtGravel: { base: "#d8c6a7", accent: "#bc9d6f", detail: "#8f6f43", labelKey: "option.dirtGravel" },
+  asphalt: { base: "#7a848d", accent: "#646f79", detail: "#49535d", labelKey: "option.asphalt" },
+};
+
+const LEGACY_COLOR_TO_TEXTURE = {
+  Beige: "indoorGym",
+  Gray: "concrete",
+  Blue: "asphalt",
+  Green: "grass",
+  Tan: "dirtGravel",
+  White: "concrete",
 };
 let customBackgroundConfig = null;
 
@@ -184,8 +194,8 @@ customMapHeightInput?.addEventListener("change", () => {
   updateCurrentCustomMap({ height: customMapHeightInput.value });
 });
 
-customMapColorSelect?.addEventListener("change", () => {
-  updateCurrentCustomMap({ colorName: customMapColorSelect.value });
+customMapTextureSelect?.addEventListener("change", () => {
+  updateCurrentCustomMap({ textureName: customMapTextureSelect.value });
 });
 
 deleteCustomMapBtn?.addEventListener("click", async () => {
@@ -261,7 +271,7 @@ function syncCustomMapEditor() {
   customMapEditor.hidden = !isCustom;
   customMapEditor.setAttribute("aria-hidden", String(!isCustom));
 
-  [customMapNameInput, customMapWidthInput, customMapHeightInput, customMapColorSelect, deleteCustomMapBtn].forEach((el) => {
+  [customMapNameInput, customMapWidthInput, customMapHeightInput, customMapTextureSelect, deleteCustomMapBtn].forEach((el) => {
     if (!el) return;
     el.disabled = !isCustom;
   });
@@ -271,10 +281,10 @@ function syncCustomMapEditor() {
   customMapNameInput.value = customBackgroundConfig.name;
   customMapWidthInput.value = String(customBackgroundConfig.width);
   customMapHeightInput.value = String(customBackgroundConfig.height);
-  customMapColorSelect.value = customBackgroundConfig.colorName || "Beige";
+  customMapTextureSelect.value = customBackgroundConfig.textureName || LEGACY_COLOR_TO_TEXTURE[customBackgroundConfig.colorName] || "indoorGym";
   customMapWidthInput.disabled = !isCustom || isImageMap;
   customMapHeightInput.disabled = !isCustom || isImageMap;
-  customMapColorSelect.disabled = !isCustom || isImageMap;
+  customMapTextureSelect.disabled = !isCustom || isImageMap;
   if (customMapDrawLineBtn) {
     customMapDrawLineBtn.disabled = !isCustom;
     customMapDrawLineBtn.classList.toggle("active", sidebarDrawState.enabled && sidebarDrawState.mode === "line" && isCustom);
@@ -584,11 +594,7 @@ function beginSidebarAnnotationDraw(event) {
   const isCustomMap = backgroundSelect.value === CUSTOM_BACKGROUND_KEY
     && customBackgroundConfig;
   if (!sidebarDrawState.enabled || !isCustomMap) return;
-  if (
-    event.target.closest(".room-object") ||
-    event.target.closest(".room-divider") ||
-    event.target.closest(".divider-rotate-anchor")
-  ) {
+  if (event.target.closest(".room-object")) {
     return;
   }
 
@@ -676,36 +682,62 @@ function applyBackground(path) {
   renderSidebarMapAnnotations();
 }
 
-function buildCustomMapSvgData(widthCm, heightCm, colorHex) {
+function getTexturePreset(textureName) {
+  const normalized = BASIC_MAP_TEXTURES[textureName] ? textureName : LEGACY_COLOR_TO_TEXTURE[textureName];
+  return BASIC_MAP_TEXTURES[normalized || "indoorGym"];
+}
+
+function buildTexturePatternSvg(textureName) {
+  const normalized = BASIC_MAP_TEXTURES[textureName] ? textureName : "indoorGym";
+  const id = `texture_${normalized}`;
+
+  switch (normalized) {
+    case "concrete":
+      return `<defs><pattern id="${id}" width="36" height="36" patternUnits="userSpaceOnUse"><circle cx="7" cy="9" r="1.5" fill="#7d8893" opacity="0.55"/><circle cx="24" cy="15" r="1.2" fill="#8a949e" opacity="0.45"/><circle cx="18" cy="28" r="1.4" fill="#717b86" opacity="0.5"/><circle cx="31" cy="8" r="1" fill="#5f6a76" opacity="0.35"/><circle cx="11" cy="24" r="0.9" fill="#5f6a76" opacity="0.25"/></pattern></defs><rect width="100%" height="100%" fill="url(#${id})" opacity="0.55"/>`;
+    case "woodDeck":
+      return `<defs><pattern id="${id}" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M0 6 H28 M0 14 H28 M0 22 H28" stroke="#9c6d42" stroke-width="1.6" opacity="0.55"/><path d="M0 10 C6 8, 10 12, 16 10 S24 12, 28 10" stroke="#7f5330" stroke-width="1" fill="none" opacity="0.35"/><path d="M0 18 C7 16, 11 20, 18 18 S24 20, 28 18" stroke="#7f5330" stroke-width="1" fill="none" opacity="0.35"/></pattern></defs><rect width="100%" height="100%" fill="url(#${id})" opacity="0.6"/>`;
+    case "stoneBrick":
+      return `<defs><pattern id="${id}" width="64" height="32" patternUnits="userSpaceOnUse"><path d="M0 16 H64 M0 0 H64 M0 32 H64" stroke="#8f867b" stroke-width="1" opacity="0.45"/><path d="M0 0 V16 M32 0 V16 M16 16 V32 M48 16 V32" stroke="#9f968a" stroke-width="1" opacity="0.4"/><path d="M32 0 V32" stroke="#7f766d" stroke-width="0.8" opacity="0.25"/></pattern></defs><rect width="100%" height="100%" fill="url(#${id})" opacity="0.6"/>`;
+    case "grass":
+      return `<defs><pattern id="${id}" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M3 28 L8 8 M8 28 L14 10 M14 28 L18 6 M20 28 L25 12" stroke="#7aa55a" stroke-width="1.4" opacity="0.6" stroke-linecap="round"/><path d="M0 20 C6 18, 9 22, 15 20 S24 22, 30 19" stroke="#87b06a" stroke-width="1" opacity="0.35" fill="none"/></pattern></defs><rect width="100%" height="100%" fill="url(#${id})" opacity="0.6"/>`;
+    case "dirtGravel":
+      return `<defs><pattern id="${id}" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="5" cy="7" r="1.5" fill="#9a7446" opacity="0.45"/><circle cx="12" cy="19" r="1.8" fill="#7d5d38" opacity="0.35"/><circle cx="22" cy="11" r="1.3" fill="#8a6a42" opacity="0.4"/><circle cx="19" cy="22" r="1.1" fill="#6e5232" opacity="0.35"/><circle cx="8" cy="14" r="0.9" fill="#6e5232" opacity="0.3"/></pattern></defs><rect width="100%" height="100%" fill="url(#${id})" opacity="0.65"/>`;
+    case "asphalt":
+      return `<defs><pattern id="${id}" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="4" cy="6" r="0.8" fill="#edf2f6" opacity="0.38"/><circle cx="13" cy="10" r="0.7" fill="#d7dfe6" opacity="0.32"/><circle cx="20" cy="17" r="0.9" fill="#f7fafc" opacity="0.26"/><circle cx="8" cy="20" r="0.8" fill="#c9d3dc" opacity="0.3"/></pattern></defs><rect width="100%" height="100%" fill="url(#${id})" opacity="0.52"/>`;
+    default:
+      return `<defs><pattern id="${id}" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M0 0 H40 M0 20 H40 M0 40 H40 M0 0 V40 M20 0 V40" stroke="#c4b79c" stroke-width="1" opacity="0.18"/></pattern></defs><rect width="100%" height="100%" fill="url(#${id})" opacity="0.4"/>`;
+  }
+}
+
+function buildCustomMapSvgData(widthCm, heightCm, textureName) {
+  const preset = getTexturePreset(textureName);
+  const normalized = BASIC_MAP_TEXTURES[textureName] ? textureName : LEGACY_COLOR_TO_TEXTURE[textureName] || "indoorGym";
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${widthCm}" height="${heightCm}" viewBox="0 0 ${widthCm} ${heightCm}">`,
-    `<rect x="0" y="0" width="${widthCm}" height="${heightCm}" fill="${colorHex}"/>`,
-    `<rect x="1" y="1" width="${Math.max(0, widthCm - 2)}" height="${Math.max(0, heightCm - 2)}" fill="none" stroke="#4e5a63" stroke-width="2"/>`,
+    `<rect x="0" y="0" width="${widthCm}" height="${heightCm}" fill="${preset.base}"/>`,
+    buildTexturePatternSvg(normalized),
+    `<rect x="1" y="1" width="${Math.max(0, widthCm - 2)}" height="${Math.max(0, heightCm - 2)}" fill="none" stroke="${preset.detail}" stroke-width="2" opacity="0.85"/>`,
     "</svg>",
   ].join("");
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-function registerCustomMap(widthCm, heightCm, colorName, mapName = "Custom Map", mapMeta = null) {
-  const hex = BASIC_MAP_COLORS[colorName];
-  if (!hex) {
-    throw new Error(t("error.unsupportedMapColor"));
-  }
-
-  if (!Number.isFinite(widthCm) || !Number.isFinite(heightCm) || widthCm <= 0 || heightCm <= 0) {
-    throw new Error(t("error.mapDimensionsPositive"));
+function registerCustomMap(widthCm, heightCm, textureName, mapName = "Custom Map", mapMeta = null) {
+  const normalizedTexture = BASIC_MAP_TEXTURES[textureName] ? textureName : LEGACY_COLOR_TO_TEXTURE[textureName];
+  const preset = getTexturePreset(normalizedTexture);
+  if (!preset) {
+    throw new Error(t("error.unsupportedMapTexture"));
   }
 
   const name = String(mapName).trim() || "Custom Map";
 
   backgroundDimensions[CUSTOM_BACKGROUND_KEY] = { width: widthCm, height: heightCm };
-  backgroundSources[CUSTOM_BACKGROUND_KEY] = buildCustomMapSvgData(widthCm, heightCm, hex);
+  backgroundSources[CUSTOM_BACKGROUND_KEY] = buildCustomMapSvgData(widthCm, heightCm, normalizedTexture || "indoorGym");
   customBackgroundConfig = {
     name,
     width: widthCm,
     height: heightCm,
-    colorName,
-    colorHex: hex,
+    textureName: normalizedTexture || "indoorGym",
     mapMeta: mapMeta ? JSON.parse(JSON.stringify(mapMeta)) : null,
   };
 
@@ -715,7 +747,7 @@ function registerCustomMap(widthCm, heightCm, colorName, mapName = "Custom Map",
     option.value = CUSTOM_BACKGROUND_KEY;
     backgroundSelect.appendChild(option);
   }
-  option.textContent = `${name} (${widthCm}x${heightCm} cm, ${colorName})`;
+  option.textContent = name;
   option.dataset.fullLabel = option.textContent;
   syncBackgroundSelectTitle();
 }
@@ -750,7 +782,7 @@ function registerCustomImageMap(widthCm, heightCm, mapName, imageSource, mapMeta
     option.value = CUSTOM_BACKGROUND_KEY;
     backgroundSelect.appendChild(option);
   }
-  option.textContent = `${name} (${widthCm}x${heightCm} cm, Satellite)`;
+  option.textContent = name;
   option.dataset.fullLabel = option.textContent;
   syncBackgroundSelectTitle();
 }
@@ -798,7 +830,12 @@ function updateCurrentCustomMap(changes) {
   const nextName = String(changes.name ?? customBackgroundConfig.name).trim();
   const nextWidth = Number(changes.width ?? customBackgroundConfig.width);
   const nextHeight = Number(changes.height ?? customBackgroundConfig.height);
-  const nextColor = String(changes.colorName ?? customBackgroundConfig.colorName);
+  const nextTexture = String(
+    changes.textureName
+    ?? customBackgroundConfig.textureName
+    ?? LEGACY_COLOR_TO_TEXTURE[customBackgroundConfig.colorName]
+    ?? "indoorGym",
+  );
   const isImageMap = customBackgroundConfig.sourceType === "image";
 
   if (!nextName) {
@@ -820,8 +857,8 @@ function updateCurrentCustomMap(changes) {
     return false;
   }
 
-  if (!isImageMap && !BASIC_MAP_COLORS[nextColor]) {
-    setHint(t("hint.invalidCustomMapColor"));
+  if (!isImageMap && !BASIC_MAP_TEXTURES[nextTexture]) {
+    setHint(t("hint.invalidCustomMapTexture"));
     syncCustomMapEditor();
     return false;
   }
@@ -835,7 +872,7 @@ function updateCurrentCustomMap(changes) {
       customBackgroundConfig.mapMeta || null,
     );
   } else {
-    registerCustomMap(Math.round(nextWidth), Math.round(nextHeight), nextColor, nextName, customBackgroundConfig.mapMeta || null);
+    registerCustomMap(Math.round(nextWidth), Math.round(nextHeight), nextTexture, nextName, customBackgroundConfig.mapMeta || null);
   }
   backgroundSelect.value = CUSTOM_BACKGROUND_KEY;
   applyBackground(backgroundSelect.value);
@@ -855,7 +892,7 @@ function promptForNewMap() {
   newMapNameInput.value = customBackgroundConfig?.name || "Custom Map";
   newMapWidthInput.value = String(Math.round(currentDims.width));
   newMapHeightInput.value = String(Math.round(currentDims.height));
-  newMapColorSelect.value = customBackgroundConfig?.colorName || "Beige";
+  newMapTextureSelect.value = customBackgroundConfig?.textureName || LEGACY_COLOR_TO_TEXTURE[customBackgroundConfig?.colorName] || "indoorGym";
 
   const closeDialog = () => {
     newMapForm.removeEventListener("submit", handleCreate);
@@ -872,7 +909,7 @@ function promptForNewMap() {
     const mapName = String(newMapNameInput.value || "").trim();
     const widthCm = Number(newMapWidthInput.value);
     const heightCm = Number(newMapHeightInput.value);
-    const colorName = newMapColorSelect.value;
+    const textureName = newMapTextureSelect.value;
 
     if (!mapName) {
       setHint(t("hint.enterMapName"));
@@ -886,13 +923,13 @@ function promptForNewMap() {
       return;
     }
 
-    if (!BASIC_MAP_COLORS[colorName]) {
-      setHint(t("hint.invalidColorChoice"));
+    if (!BASIC_MAP_TEXTURES[textureName]) {
+      setHint(t("hint.invalidTextureChoice"));
       return;
     }
 
     try {
-      registerCustomMap(Math.round(widthCm), Math.round(heightCm), colorName, mapName);
+      registerCustomMap(Math.round(widthCm), Math.round(heightCm), textureName, mapName);
       backgroundSelect.value = CUSTOM_BACKGROUND_KEY;
       window.switchMapObjects?.(CUSTOM_BACKGROUND_KEY, { clearStore: true });
       applyBackground(backgroundSelect.value);
@@ -913,7 +950,7 @@ function promptForNewMap() {
         name: mapName,
         width: Math.round(widthCm),
         height: Math.round(heightCm),
-        color: colorName,
+        texture: t(BASIC_MAP_TEXTURES[textureName].labelKey),
       }));
     } catch (error) {
       console.error(error);
@@ -1748,59 +1785,6 @@ function loadImageElement(source) {
   });
 }
 
-async function fetchGoogleMapsSatelliteImage(context) {
-  const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
-  url.searchParams.set("center", `${context.latitude},${context.longitude}`);
-  url.searchParams.set("zoom", String(Math.round(context.zoom)));
-  url.searchParams.set("size", `${GOOGLE_STATIC_MAP_SIZE}x${GOOGLE_STATIC_MAP_SIZE}`);
-  url.searchParams.set("maptype", "satellite");
-  url.searchParams.set("format", "png");
-  url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
-  const urlString = url.toString();
-
-  // Step 1: Try to convert to a self-contained data URL via canvas.
-  // This works when the Static Maps API sends CORS headers, giving an offline-safe result.
-  const dataUrl = await tryLoadImageAsDataUrl(urlString);
-  if (dataUrl) return dataUrl;
-
-  // Step 2: CORS blocked canvas export. Verify the URL at least loads as an <img> source.
-  const loads = await verifyImageUrlLoads(urlString);
-  if (loads) return urlString;
-
-  // Step 3: Image did not load at all — API key is likely not configured for Maps Static API.
-  throw new Error(t("error.unableLoadSatelliteImage"));
-}
-
-function tryLoadImageAsDataUrl(imageUrl) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth || GOOGLE_STATIC_MAP_SIZE;
-        canvas.height = img.naturalHeight || GOOGLE_STATIC_MAP_SIZE;
-        canvas.getContext("2d").drawImage(img, 0, 0);
-        resolve(canvas.toDataURL("image/png"));
-      } catch {
-        // Canvas tainted — CORS headers not present; resolve null to try URL fallback.
-        resolve(null);
-      }
-    };
-    img.onerror = () => resolve(null); // CORS-mode request rejected; try non-CORS next.
-    img.src = imageUrl;
-  });
-}
-
-function verifyImageUrlLoads(imageUrl) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = imageUrl;
-  });
-}
-
 window.registerCustomImageMap = registerCustomImageMap;
 window.promptForGoogleMapImport = promptForGoogleMapImport;
 
@@ -1836,10 +1820,13 @@ function getBackgroundPanLimits() {
   const containerHeight = roomCanvas.clientHeight;
   const renderedWidth   = dims.width  * backgroundState.zoom;
   const renderedHeight  = dims.height * backgroundState.zoom;
+  const overscrollRatio = 0.10;
+  const overscrollX = renderedWidth * overscrollRatio;
+  const overscrollY = renderedHeight * overscrollRatio;
 
   return {
-    x: Math.max(0, (renderedWidth  - containerWidth)  / 2),
-    y: Math.max(0, (renderedHeight - containerHeight) / 2),
+    x: Math.max(0, (renderedWidth  - containerWidth)  / 2) + overscrollX,
+    y: Math.max(0, (renderedHeight - containerHeight) / 2) + overscrollY,
   };
 }
 
@@ -1894,9 +1881,6 @@ function renderBackgroundView() {
   roomCanvas.classList.toggle("bg-move-mode", backgroundState.moveMode);
   syncBackgroundSelectTitle();
   renderSidebarMapAnnotations();
-
-  // Defined in dividers.js and rulers.js — resolved at call time.
-  renderAllDividers();
   renderRulers();
 }
 
@@ -1914,24 +1898,6 @@ function clientToSceneCoords(clientX, clientY) {
   return {
     x: (clientX - cx) / backgroundState.zoom,
     y: (clientY - cy) / backgroundState.zoom,
-  };
-}
-
-function sceneToCanvasCoords(x, y) {
-  return {
-    x: roomCanvas.clientWidth  / 2 + backgroundState.panX + x * backgroundState.zoom,
-    y: roomCanvas.clientHeight / 2 + backgroundState.panY + y * backgroundState.zoom,
-  };
-}
-
-function getVisibleSceneBounds() {
-  const halfWidth  = roomCanvas.clientWidth  / 2;
-  const halfHeight = roomCanvas.clientHeight / 2;
-  return {
-    minX: (-halfWidth  - backgroundState.panX) / backgroundState.zoom,
-    maxX: ( halfWidth  - backgroundState.panX) / backgroundState.zoom,
-    minY: (-halfHeight - backgroundState.panY) / backgroundState.zoom,
-    maxY: ( halfHeight - backgroundState.panY) / backgroundState.zoom,
   };
 }
 

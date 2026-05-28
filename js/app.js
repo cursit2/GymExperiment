@@ -4,7 +4,16 @@ const palette         = document.getElementById("palette");
 const resetBackgroundBtn = document.getElementById("resetBackgroundBtn");
 const newMapBtn      = document.getElementById("newMapBtn");
 const importGoogleMapBtn = document.getElementById("importGoogleMapBtn");
-const dividerBtn      = document.getElementById("dividerBtn");
+const addNoteBtn = document.getElementById("addNoteBtn");
+const suggestPlannerBtn = document.getElementById("suggestPlannerBtn");
+const measureToolBtn = document.getElementById("measureToolBtn");
+const toggleMouseModeBtn = document.getElementById("toggleMouseModeBtn");
+const alignLeftBtn = document.getElementById("alignLeftBtn");
+const alignCenterBtn = document.getElementById("alignCenterBtn");
+const rotateCWBtn = document.getElementById("rotateCWBtn");
+const rotateCCWBtn = document.getElementById("rotateCCWBtn");
+const copySelectionBtn = document.getElementById("copySelectionBtn");
+const pasteSelectionBtn = document.getElementById("pasteSelectionBtn");
 const deleteBtn       = document.getElementById("deleteBtn");
 const clearBtn        = document.getElementById("clearBtn");
 const undoBtn         = document.getElementById("undoBtn");
@@ -18,7 +27,109 @@ const actionsTabPanel = document.getElementById("actionsTabPanel");
 const mapTabPanel = document.getElementById("mapTabPanel");
 const newEquipmentDialog = document.getElementById("newEquipmentDialog");
 const newEquipmentForm = document.getElementById("newEquipmentForm");
+const newNoteDialog = document.getElementById("newNoteDialog");
+const newNoteForm = document.getElementById("newNoteForm");
+const newNoteTextInput = document.getElementById("newNoteTextInput");
+const newNoteColorInput = document.getElementById("newNoteColorInput");
+const newNoteCancelBtn = document.getElementById("newNoteCancelBtn");
+const suggestPlannerDialog = document.getElementById("suggestPlannerDialog");
+const suggestPlannerForm = document.getElementById("suggestPlannerForm");
+const suggestPlannerCancelBtn = document.getElementById("suggestPlannerCancelBtn");
+const suggestBarsCountInput = document.getElementById("suggestBarsCountInput");
+const suggestBeamCountInput = document.getElementById("suggestBeamCountInput");
+const suggestBoxVaultCountInput = document.getElementById("suggestBoxVaultCountInput");
+const suggestFloorCountInput = document.getElementById("suggestFloorCountInput");
+const suggestVaultCountInput = document.getElementById("suggestVaultCountInput");
+const plannerSelect = document.getElementById("plannerSelect");
+const newPlannerBtn = document.getElementById("newPlannerBtn");
+const deletePlannerBtn = document.getElementById("deletePlannerBtn");
+const APP_DEFAULT_PLANNER_KEY = "default";
 const SAVED_MAP_OPTION_PREFIX = "save:";
+let measureToolActive = false;
+let pendingMeasurePoint = null;
+let copiedEquipmentSnapshot = null;
+let pasteNudgeCount = 0;
+let mouseInteractionMode = "drag";
+let selectionBoxState = null;
+let currentPlannerKey = APP_DEFAULT_PLANNER_KEY;
+const plannerSelectionByMap = {};
+
+const selectionMarqueeEl = document.createElement("div");
+selectionMarqueeEl.className = "selection-marquee";
+selectionMarqueeEl.hidden = true;
+roomCanvas.appendChild(selectionMarqueeEl);
+
+const SUGGEST_PLANNER_CORE_TYPES = ["bars", "beam", "boxVault", "floor", "vault"];
+
+function syncMouseModeBtn() {
+  if (!toggleMouseModeBtn) return;
+  const isSelect = mouseInteractionMode === "select";
+  toggleMouseModeBtn.dataset.active = String(isSelect);
+  toggleMouseModeBtn.textContent = isSelect ? t("btn.mouseModeSelect") : t("btn.mouseModeDrag");
+}
+
+window.syncMouseModeBtn = syncMouseModeBtn;
+window.getMouseInteractionMode = () => mouseInteractionMode;
+
+function setMouseInteractionMode(mode) {
+  const next = mode === "select" ? "select" : "drag";
+  if (mouseInteractionMode === next) return;
+  mouseInteractionMode = next;
+  selectionBoxState = null;
+  selectionMarqueeEl.hidden = true;
+  syncMouseModeBtn();
+  setHint(t(next === "select" ? "hint.selectModeEnabled" : "hint.dragModeEnabled"));
+}
+
+toggleMouseModeBtn?.addEventListener("click", () => {
+  setMouseInteractionMode(mouseInteractionMode === "drag" ? "select" : "drag");
+});
+
+syncMouseModeBtn();
+
+function copySelectedEquipmentToClipboard() {
+  const snapshot = window.getSelectedObjectsClipboardData?.();
+  if (!snapshot || !Array.isArray(snapshot.items) || snapshot.items.length === 0) {
+    setHint(t("hint.nothingToCopy"));
+    return false;
+  }
+
+  copiedEquipmentSnapshot = snapshot;
+  pasteNudgeCount = 0;
+  setHint(t("hint.copiedSelection", { count: snapshot.items.length }));
+  return true;
+}
+
+function pasteCopiedEquipmentFromClipboard() {
+  if (!copiedEquipmentSnapshot || !Array.isArray(copiedEquipmentSnapshot.items) || copiedEquipmentSnapshot.items.length === 0) {
+    setHint(t("hint.nothingToPaste"));
+    return false;
+  }
+
+  pasteNudgeCount += 1;
+  const pasteOffset = 24 * pasteNudgeCount;
+  const pasted = window.pasteObjectsFromClipboardData?.(copiedEquipmentSnapshot, {
+    offsetX: pasteOffset,
+    offsetY: pasteOffset,
+  }) || [];
+
+  if (pasted.length === 0) {
+    setHint(t("hint.nothingToPaste"));
+    return false;
+  }
+
+  savePlannerToLocalStorage();
+  setHint(t("hint.pastedSelection", { count: pasted.length }));
+  return true;
+}
+
+function setMeasureToolActive(active) {
+  measureToolActive = Boolean(active);
+  pendingMeasurePoint = null;
+  if (measureToolBtn) {
+    measureToolBtn.dataset.active = String(measureToolActive);
+  }
+}
 
 async function refreshSavedMapOptions() {
   const existingSavedOptions = [...backgroundSelect.options].filter((option) => (
@@ -29,50 +140,170 @@ async function refreshSavedMapOptions() {
 
   try {
     const res = await fetch("/api/saved-maps");
-    if (!res.ok) return;
-    const savedMaps = await res.json();
-    if (!Array.isArray(savedMaps)) return;
+    if (res.ok) {
+      const savedMaps = await res.json();
+      if (Array.isArray(savedMaps)) {
+        const normalizeLabel = (value) => String(value || "").trim().toLowerCase();
+        const existingLabels = new Set(
+          [...backgroundSelect.options]
+            .map((option) => normalizeLabel(option.textContent))
+            .filter(Boolean),
+        );
 
-    const normalizeLabel = (value) => String(value || "").trim().toLowerCase();
-    const existingOptionLabels = [...backgroundSelect.options]
-      .map((option) => normalizeLabel(option.textContent))
-      .filter(Boolean);
-    const existingLabels = new Set(existingOptionLabels);
-    const existingSources = new Set(
-      [...backgroundSelect.options]
-        .filter((option) => option.dataset.savedMap !== "true")
-        .map((option) => String(option.value || "").trim())
-        .filter(Boolean),
-    );
+        savedMaps.forEach((item) => {
+          const saveName = String(item?.saveName || "").trim();
+          if (!saveName) return;
 
-    savedMaps.forEach((item) => {
-      const saveName = String(item?.saveName || "").trim();
-      if (!saveName) return;
-      const src = String(item?.src || "").trim();
-      if (src && src !== CUSTOM_BACKGROUND_KEY && existingSources.has(src)) return;
-      const label = String(item?.label || saveName).trim();
-      const normalizedLabel = normalizeLabel(label);
-      const collidesWithExisting = existingOptionLabels.some((existing) => (
-        existing === normalizedLabel
-        || existing.startsWith(`${normalizedLabel} (`)
-      ));
-      if (collidesWithExisting || existingLabels.has(normalizedLabel)) return;
+          const label = String(item?.label || saveName).trim() || saveName;
+          const normalizedLabel = normalizeLabel(label);
+          if (existingLabels.has(normalizedLabel)) return;
 
-      const option = document.createElement("option");
-      option.value = `${SAVED_MAP_OPTION_PREFIX}${saveName}`;
-      option.textContent = label;
-      option.dataset.savedMap = "true";
-      option.dataset.fullLabel = option.textContent;
-      backgroundSelect.appendChild(option);
-      existingLabels.add(normalizedLabel);
-    });
-
-    syncBackgroundSelectTitle();
+          const option = document.createElement("option");
+          option.value = `${SAVED_MAP_OPTION_PREFIX}${saveName}`;
+          option.textContent = label;
+          option.dataset.savedMap = "true";
+          option.dataset.fullLabel = label;
+          backgroundSelect.appendChild(option);
+          existingLabels.add(normalizedLabel);
+        });
+      }
+    }
   } catch {
-    // Keep normal background options when saved-map list is unavailable.
+    // Keep base background options when saved-map listing is unavailable.
   }
+
+  syncBackgroundSelectTitle();
+  await refreshPlannerOptions();
 }
 window.refreshSavedMapOptions = refreshSavedMapOptions;
+
+function sanitizePlannerKey(value) {
+  const normalized = String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  return normalized || APP_DEFAULT_PLANNER_KEY;
+}
+
+function plannerDisplayName(key) {
+  if (key === APP_DEFAULT_PLANNER_KEY) {
+    return t("option.defaultPlanner");
+  }
+  return key.replace(/[_-]+/g, " ");
+}
+
+function setActivePlannerKey(nextKey) {
+  const key = sanitizePlannerKey(nextKey);
+  currentPlannerKey = key;
+  const src = backgroundSelect?.value || "";
+  if (src) {
+    plannerSelectionByMap[src] = key;
+  }
+}
+
+window.getActivePlannerKey = () => currentPlannerKey;
+
+function derivePlannerKeyFromSaveName(saveName, src) {
+  const mapRoot = window.getMapSaveRootForSrc?.(src);
+  const normalizedSaveName = String(saveName || "").trim();
+  if (!mapRoot || !normalizedSaveName) return APP_DEFAULT_PLANNER_KEY;
+  const plannerPrefix = `${mapRoot}__planner_`;
+  if (normalizedSaveName.startsWith(plannerPrefix)) {
+    return sanitizePlannerKey(normalizedSaveName.slice(plannerPrefix.length));
+  }
+  if (normalizedSaveName === mapRoot) {
+    return APP_DEFAULT_PLANNER_KEY;
+  }
+  return APP_DEFAULT_PLANNER_KEY;
+}
+
+window.setActivePlannerKeyFromSaveName = (saveName, src) => {
+  const key = derivePlannerKeyFromSaveName(saveName, src || backgroundSelect?.value);
+  const mapSrc = src || backgroundSelect?.value || "";
+  currentPlannerKey = key;
+  if (mapSrc) {
+    plannerSelectionByMap[mapSrc] = key;
+  }
+  if (plannerSelect) {
+    plannerSelect.value = key;
+  }
+};
+
+async function refreshPlannerOptions(preferredKey = "") {
+  if (!plannerSelect) return;
+
+  const src = backgroundSelect?.value || "";
+  const mapRoot = window.getMapSaveRootForSrc?.(src);
+  const optionsByKey = new Map();
+
+  const ensureOption = (key, { legacy = false } = {}) => {
+    const normalized = sanitizePlannerKey(key);
+    if (optionsByKey.has(normalized)) {
+      const existing = optionsByKey.get(normalized);
+      existing.legacy = existing.legacy && legacy;
+      return;
+    }
+    optionsByKey.set(normalized, { key: normalized, legacy });
+  };
+
+  ensureOption(APP_DEFAULT_PLANNER_KEY);
+
+  try {
+    const res = await fetch("/api/saves");
+    if (res.ok) {
+      const saves = await res.json();
+      if (Array.isArray(saves) && mapRoot) {
+        const plannerPrefix = `${mapRoot}__planner_`;
+        saves.forEach((saveNameRaw) => {
+          const saveName = String(saveNameRaw || "").trim();
+          if (!saveName) return;
+          if (saveName === mapRoot) {
+            ensureOption(APP_DEFAULT_PLANNER_KEY, { legacy: true });
+            return;
+          }
+          if (saveName.startsWith(plannerPrefix)) {
+            ensureOption(saveName.slice(plannerPrefix.length));
+          }
+        });
+      }
+    }
+  } catch {
+    // Keep default planner option when listing saves is unavailable.
+  }
+
+  const sortedOptions = [...optionsByKey.values()]
+    .sort((a, b) => {
+      if (a.key === APP_DEFAULT_PLANNER_KEY) return -1;
+      if (b.key === APP_DEFAULT_PLANNER_KEY) return 1;
+      return a.key.localeCompare(b.key);
+    });
+
+  plannerSelect.innerHTML = "";
+  sortedOptions.forEach((entry) => {
+    const option = document.createElement("option");
+    option.value = entry.key;
+    option.textContent = plannerDisplayName(entry.key);
+    plannerSelect.appendChild(option);
+  });
+
+  const desiredKey = sanitizePlannerKey(
+    preferredKey
+    || plannerSelectionByMap[src]
+    || currentPlannerKey
+    || APP_DEFAULT_PLANNER_KEY,
+  );
+
+  if (!sortedOptions.some((entry) => entry.key === desiredKey)) {
+    const option = document.createElement("option");
+    option.value = desiredKey;
+    option.textContent = plannerDisplayName(desiredKey);
+    plannerSelect.appendChild(option);
+  }
+
+  plannerSelect.value = desiredKey;
+  setActivePlannerKey(desiredKey);
+}
 const newEquipmentNameInput = document.getElementById("newEquipmentNameInput");
 const newEquipmentLengthInput = document.getElementById("newEquipmentLengthInput");
 const newEquipmentWidthInput = document.getElementById("newEquipmentWidthInput");
@@ -212,17 +443,154 @@ roomCanvas.addEventListener("drop", (event) => {
 // Canvas pointer events (deselect + background pan)
 
 roomCanvas.addEventListener("pointerdown", () => {
+  if (measureToolActive) return;
+  if (mouseInteractionMode === "select") return;
   deselectAll();
-  deselectDivider();
 });
 
 roomCanvas.addEventListener("pointerdown", (event) => {
+  if (mouseInteractionMode !== "select") return;
+  if (measureToolActive) return;
+  if (event.target.closest(".room-object, .planner-note")) return;
+
+  const additiveSelection = event.shiftKey || event.ctrlKey || event.metaKey;
+  if (!additiveSelection) {
+    deselectAll();
+  }
+
+  const bounds = roomCanvas.getBoundingClientRect();
+  selectionBoxState = {
+    pointerId: event.pointerId,
+    additiveSelection,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    latestClientX: event.clientX,
+    latestClientY: event.clientY,
+    startScene: clientToSceneCoords(event.clientX, event.clientY),
+    latestScene: clientToSceneCoords(event.clientX, event.clientY),
+    bounds,
+  };
+
+  const left = event.clientX - bounds.left;
+  const top = event.clientY - bounds.top;
+  selectionMarqueeEl.style.left = `${left}px`;
+  selectionMarqueeEl.style.top = `${top}px`;
+  selectionMarqueeEl.style.width = "0px";
+  selectionMarqueeEl.style.height = "0px";
+  selectionMarqueeEl.hidden = false;
+  roomCanvas.setPointerCapture(event.pointerId);
+  event.preventDefault();
+});
+
+roomCanvas.addEventListener("pointermove", (event) => {
+  if (!selectionBoxState || selectionBoxState.pointerId !== event.pointerId) return;
+
+  selectionBoxState.latestClientX = event.clientX;
+  selectionBoxState.latestClientY = event.clientY;
+  selectionBoxState.latestScene = clientToSceneCoords(event.clientX, event.clientY);
+
+  const leftPx = Math.min(selectionBoxState.startClientX, event.clientX) - selectionBoxState.bounds.left;
+  const topPx = Math.min(selectionBoxState.startClientY, event.clientY) - selectionBoxState.bounds.top;
+  const widthPx = Math.abs(event.clientX - selectionBoxState.startClientX);
+  const heightPx = Math.abs(event.clientY - selectionBoxState.startClientY);
+
+  selectionMarqueeEl.style.left = `${leftPx}px`;
+  selectionMarqueeEl.style.top = `${topPx}px`;
+  selectionMarqueeEl.style.width = `${widthPx}px`;
+  selectionMarqueeEl.style.height = `${heightPx}px`;
+});
+
+roomCanvas.addEventListener("pointerup", (event) => {
+  if (!selectionBoxState || selectionBoxState.pointerId !== event.pointerId) return;
+  if (roomCanvas.hasPointerCapture(event.pointerId)) {
+    roomCanvas.releasePointerCapture(event.pointerId);
+  }
+
+  const draggedDistance = Math.hypot(
+    selectionBoxState.latestClientX - selectionBoxState.startClientX,
+    selectionBoxState.latestClientY - selectionBoxState.startClientY,
+  );
+
+  const minX = Math.min(selectionBoxState.startScene.x, selectionBoxState.latestScene.x);
+  const maxX = Math.max(selectionBoxState.startScene.x, selectionBoxState.latestScene.x);
+  const minY = Math.min(selectionBoxState.startScene.y, selectionBoxState.latestScene.y);
+  const maxY = Math.max(selectionBoxState.startScene.y, selectionBoxState.latestScene.y);
+
+  let selectedCount = 0;
+  if (draggedDistance >= 3) {
+    roomCanvas.querySelectorAll(".room-object, .planner-note").forEach((obj) => {
+      const left = parseFloat(obj.style.left) || 0;
+      const top = parseFloat(obj.style.top) || 0;
+      const right = left + obj.offsetWidth;
+      const bottom = top + obj.offsetHeight;
+      const intersects = right >= minX && left <= maxX && bottom >= minY && top <= maxY;
+      if (!intersects) return;
+      const id = obj.dataset.id || obj.dataset.annotationId;
+      if (!id) return;
+      selectObject(id, { append: true });
+      selectedCount += 1;
+    });
+  }
+
+  selectionMarqueeEl.hidden = true;
+  selectionBoxState = null;
+  if (selectedCount > 0) {
+    setHint(t("hint.selectionCaptured", { count: selectedCount }));
+  }
+});
+
+roomCanvas.addEventListener("pointercancel", (event) => {
+  if (!selectionBoxState || selectionBoxState.pointerId !== event.pointerId) return;
+  selectionMarqueeEl.hidden = true;
+  selectionBoxState = null;
+});
+
+roomCanvas.addEventListener("pointerdown", (event) => {
+  if (!measureToolActive) return;
+  if (event.target.closest(".room-object, .planner-note")) return;
+
+  const scenePoint = clientToSceneCoords(event.clientX, event.clientY);
+  if (!pendingMeasurePoint) {
+    pendingMeasurePoint = scenePoint;
+    setHint(t("hint.measureSecondPoint"));
+    event.preventDefault();
+    return;
+  }
+
+  const dx = scenePoint.x - pendingMeasurePoint.x;
+  const dy = scenePoint.y - pendingMeasurePoint.y;
+  const distanceCm = Math.sqrt((dx * dx) + (dy * dy));
+  if (distanceCm < 1) {
+    pendingMeasurePoint = null;
+    setHint(t("hint.measureTooShort"));
+    event.preventDefault();
+    return;
+  }
+
+  const createdMeasure = createMeasurementAnnotation(
+    pendingMeasurePoint.x,
+    pendingMeasurePoint.y,
+    scenePoint.x,
+    scenePoint.y,
+  );
+  if (createdMeasure) {
+    pushUndo(() => {
+      createdMeasure.remove();
+      savePlannerToLocalStorage();
+      setHint(t("hint.undoAnnotationRemoved"));
+    });
+  }
+  pendingMeasurePoint = null;
+  setMeasureToolActive(false);
+  savePlannerToLocalStorage();
+  setHint(t("hint.measureAdded", { meters: (distanceCm / 100).toFixed(2) }));
+  event.preventDefault();
+});
+
+roomCanvas.addEventListener("pointerdown", (event) => {
+  if (mouseInteractionMode === "select") return;
   if (!backgroundState.moveMode) return;
-  if (
-    event.target.closest(".room-object") ||
-    event.target.closest(".room-divider") ||
-    event.target.closest(".divider-rotate-anchor")
-  ) return;
+  if (event.target.closest(".room-object, .planner-note")) return;
 
   backgroundState.pointerId = event.pointerId;
   backgroundState.startX    = event.clientX;
@@ -246,6 +614,7 @@ roomCanvas.addEventListener("pointermove", (event) => {
 });
 
 roomCanvas.addEventListener("pointerup", (event) => {
+  if (selectionBoxState && selectionBoxState.pointerId === event.pointerId) return;
   if (backgroundState.pointerId !== event.pointerId) return;
   backgroundState.pointerId = null;
   roomCanvas.classList.remove("bg-moving");
@@ -255,6 +624,7 @@ roomCanvas.addEventListener("pointerup", (event) => {
 });
 
 roomCanvas.addEventListener("pointercancel", (event) => {
+  if (selectionBoxState && selectionBoxState.pointerId === event.pointerId) return;
   if (backgroundState.pointerId !== event.pointerId) return;
   backgroundState.pointerId = null;
   roomCanvas.classList.remove("bg-moving");
@@ -323,6 +693,7 @@ addEquipmentBtn.addEventListener("click", () => {
         color: newEquipmentColorInput.value,
       });
       syncCustomEquipmentEditor(key);
+      void window.saveCustomEquipmentCatalog?.();
       savePlannerToLocalStorage();
       setHint(t("hint.addedEquipment", { name: window.objectCatalog[key].label }));
       closeDialog();
@@ -337,6 +708,427 @@ addEquipmentBtn.addEventListener("click", () => {
   newEquipmentNameInput.focus();
 });
 
+function openNoteDialog(options = {}) {
+  if (!newNoteDialog || !newNoteForm) {
+    setHint(t("hint.noteDialogUnavailable"));
+    return;
+  }
+  if (newNoteDialog.open) return;
+
+  const mode = options.mode === "edit" ? "edit" : "create";
+  const targetNote = options.noteEl || null;
+  const initialText = String(options.initialText || "");
+  const initialColor = String(options.initialColor || "#fff5bf");
+
+  newNoteTextInput.value = initialText;
+  newNoteColorInput.value = initialColor;
+
+  const closeDialog = () => {
+    newNoteForm.removeEventListener("submit", handleSubmitNote);
+    newNoteCancelBtn.removeEventListener("click", handleCancelNote);
+    newNoteDialog.removeEventListener("close", handleDialogClose);
+    if (newNoteDialog.open) newNoteDialog.close();
+  };
+
+  const handleDialogClose = () => {
+    newNoteForm.removeEventListener("submit", handleSubmitNote);
+    newNoteCancelBtn.removeEventListener("click", handleCancelNote);
+    newNoteDialog.removeEventListener("close", handleDialogClose);
+  };
+
+  const handleCancelNote = () => {
+    setHint(t("hint.noteCanceled"));
+    closeDialog();
+  };
+
+  const handleSubmitNote = (event) => {
+    event.preventDefault();
+
+    const trimmed = newNoteTextInput.value.trim();
+    if (!trimmed) {
+      setHint(t("hint.noteEmpty"));
+      return;
+    }
+
+    if (mode === "edit" && targetNote) {
+      const contentEl = targetNote.querySelector(".planner-note-content");
+      const previousText = targetNote.dataset.text || contentEl?.textContent || "";
+      const previousColor = targetNote.dataset.color || targetNote.style.background || "#fff5bf";
+
+      targetNote.dataset.text = trimmed;
+      targetNote.dataset.color = newNoteColorInput.value;
+      targetNote.style.background = newNoteColorInput.value;
+      if (contentEl) {
+        contentEl.textContent = trimmed;
+      }
+
+      if (trimmed !== previousText || newNoteColorInput.value !== previousColor) {
+        pushUndo(() => {
+          targetNote.dataset.text = previousText;
+          targetNote.dataset.color = previousColor;
+          targetNote.style.background = previousColor;
+          if (contentEl) {
+            contentEl.textContent = previousText;
+          }
+          savePlannerToLocalStorage();
+          setHint(t("hint.undoAnnotationRemoved"));
+        });
+      }
+
+      savePlannerToLocalStorage();
+      setHint(t("hint.noteUpdated"));
+      closeDialog();
+      return;
+    }
+
+    const canvasRect = roomCanvas.getBoundingClientRect();
+    const centerScene = clientToSceneCoords(
+      canvasRect.left + (canvasRect.width / 2),
+      canvasRect.top + (canvasRect.height / 2),
+    );
+    const createdNote = createNoteAnnotation(trimmed, centerScene.x, centerScene.y, {
+      color: newNoteColorInput.value,
+    });
+    if (createdNote) {
+      pushUndo(() => {
+        createdNote.remove();
+        savePlannerToLocalStorage();
+        setHint(t("hint.undoAnnotationRemoved"));
+      });
+    }
+    savePlannerToLocalStorage();
+    setHint(t("hint.noteAdded"));
+    closeDialog();
+  };
+
+  newNoteForm.addEventListener("submit", handleSubmitNote);
+  newNoteCancelBtn.addEventListener("click", handleCancelNote);
+  newNoteDialog.addEventListener("close", handleDialogClose);
+  newNoteDialog.showModal();
+  newNoteTextInput.focus();
+}
+
+window.openNoteEditorForExistingNote = (noteEl) => {
+  if (!noteEl || String(noteEl.dataset.annotationType) !== "note") return;
+  openNoteDialog({
+    mode: "edit",
+    noteEl,
+    initialText: noteEl.dataset.text || "",
+    initialColor: noteEl.dataset.color || "#fff5bf",
+  });
+};
+
+addNoteBtn?.addEventListener("click", () => {
+  openNoteDialog({
+    mode: "create",
+    initialText: "",
+    initialColor: "#fff5bf",
+  });
+});
+
+function parseSuggestPlannerCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(30, Math.floor(n));
+}
+
+function buildSuggestPlannerClusters(counts) {
+  const clusters = [];
+  SUGGEST_PLANNER_CORE_TYPES.forEach((type) => {
+    const count = parseSuggestPlannerCount(counts[type]);
+    for (let i = 0; i < count; i += 1) {
+      if (type === "vault" || type === "boxVault") {
+        clusters.push(["springboard", type, "mat"]);
+      } else {
+        clusters.push([type, "mat"]);
+      }
+    }
+  });
+  return clusters;
+}
+
+function getSuggestAdjacentGap(leftType, rightType) {
+  if (!leftType || !rightType) return 40;
+
+  const springToVault = leftType === "springboard" && (rightType === "vault" || rightType === "boxVault");
+  const vaultToMat = (leftType === "vault" || leftType === "boxVault") && rightType === "mat";
+  const equipmentToMat = rightType === "mat" && leftType !== "mat";
+  if (springToVault || vaultToMat || equipmentToMat) {
+    return 24;
+  }
+
+  return 40;
+}
+
+function getSuggestClusterSize(types, horizontal) {
+  const dims = types
+    .map((type) => window.objectCatalog[type])
+    .filter(Boolean)
+    .map((item) => ({ width: Number(item.width) || 0, height: Number(item.height) || 0 }));
+  if (dims.length === 0) return { width: 0, height: 0 };
+
+  let totalGap = 0;
+  for (let i = 0; i < types.length - 1; i += 1) {
+    totalGap += getSuggestAdjacentGap(types[i], types[i + 1]);
+  }
+
+  if (horizontal) {
+    const width = dims.reduce((sum, item) => sum + item.width, 0) + totalGap;
+    const height = dims.reduce((max, item) => Math.max(max, item.height), 0);
+    return { width, height };
+  }
+
+  const width = dims.reduce((max, item) => Math.max(max, item.width), 0);
+  const height = dims.reduce((sum, item) => sum + item.height, 0) + totalGap;
+  return { width, height };
+}
+
+function placeSuggestCluster(types, horizontal, startX, startY) {
+  const size = getSuggestClusterSize(types, horizontal);
+  if (size.width <= 0 || size.height <= 0) return 0;
+
+  let cursorX = startX;
+  let cursorY = startY;
+  let placed = 0;
+
+  types.forEach((type, index) => {
+    const item = window.objectCatalog[type];
+    if (!item) return;
+
+    let left;
+    let top;
+    if (horizontal) {
+      left = cursorX;
+      top = startY + ((size.height - item.height) / 2);
+      const nextType = types[index + 1];
+      cursorX += item.width + (nextType ? getSuggestAdjacentGap(type, nextType) : 0);
+    } else {
+      left = startX + ((size.width - item.width) / 2);
+      top = cursorY;
+      const nextType = types[index + 1];
+      cursorY += item.height + (nextType ? getSuggestAdjacentGap(type, nextType) : 0);
+    }
+
+    createRoomObject(type, left + (item.width / 2), top + (item.height / 2));
+    placed += 1;
+  });
+
+  return placed;
+}
+
+function applySuggestedPlanner(counts) {
+  const clusters = buildSuggestPlannerClusters(counts);
+  if (clusters.length === 0) {
+    setHint(t("hint.suggestPlannerNoItems"));
+    return;
+  }
+
+  const mapDims = backgroundDimensions[backgroundSelect.value] || { width: 4000, height: 7000 };
+  const margin = 160;
+  const clusterGap = 190;
+  const rowGap = 240;
+
+  const leftBound = (-mapDims.width / 2) + margin;
+  const rightBound = (mapDims.width / 2) - margin;
+  const topBound = (-mapDims.height / 2) + margin;
+  const bottomBound = (mapDims.height / 2) - margin;
+  const availableWidth = Math.max(600, rightBound - leftBound);
+
+  roomCanvas.querySelectorAll(".room-object, .planner-annotation").forEach((obj) => obj.remove());
+  deselectAll();
+  setMeasureToolActive(false);
+  window.clearCurrentMapObjectsStore?.();
+
+  const summary = { placedClusters: 0, skippedClusters: 0 };
+  const randomizedClusters = [...clusters].sort(() => Math.random() - 0.5);
+
+  const placeAll = () => {
+    let cursorX = leftBound;
+    let cursorY = topBound;
+    let rowHeight = 0;
+
+    randomizedClusters.forEach((types) => {
+      const horizontalSize = getSuggestClusterSize(types, true);
+      const verticalSize = getSuggestClusterSize(types, false);
+      const canHorizontal = horizontalSize.width <= availableWidth;
+      const canVertical = verticalSize.width <= availableWidth;
+
+      let useHorizontal;
+      if (canHorizontal && canVertical) {
+        useHorizontal = Math.random() >= 0.4;
+      } else if (canHorizontal) {
+        useHorizontal = true;
+      } else if (canVertical) {
+        useHorizontal = false;
+      } else {
+        summary.skippedClusters += 1;
+        return;
+      }
+
+      const activeSize = useHorizontal ? horizontalSize : verticalSize;
+
+      if (cursorX > leftBound && Math.random() < 0.18) {
+        cursorX = leftBound;
+        cursorY += rowHeight + rowGap;
+        rowHeight = 0;
+      }
+
+      if (cursorX > leftBound && (cursorX + activeSize.width) > (leftBound + availableWidth)) {
+        cursorX = leftBound;
+        cursorY += rowHeight + rowGap;
+        rowHeight = 0;
+      }
+
+      const placeX = cursorX;
+      const placeY = cursorY;
+
+      if ((placeY + activeSize.height) > bottomBound) {
+        summary.skippedClusters += 1;
+        return;
+      }
+
+      placeSuggestCluster(types, useHorizontal, placeX, placeY);
+      summary.placedClusters += 1;
+      cursorX += activeSize.width + clusterGap;
+      rowHeight = Math.max(rowHeight, activeSize.height);
+    });
+  };
+
+  if (typeof withHistorySuppressed === "function") {
+    withHistorySuppressed(placeAll);
+  } else {
+    placeAll();
+  }
+  savePlannerToLocalStorage();
+
+  if (summary.skippedClusters > 0) {
+    setHint(t("hint.suggestPlannerAppliedPartial", {
+      placed: summary.placedClusters,
+      skipped: summary.skippedClusters,
+    }));
+    return;
+  }
+
+  setHint(t("hint.suggestPlannerApplied", { placed: summary.placedClusters }));
+}
+
+function openSuggestPlannerDialog() {
+  if (!suggestPlannerDialog || !suggestPlannerForm) {
+    setHint(t("hint.suggestPlannerDialogUnavailable"));
+    return;
+  }
+  if (suggestPlannerDialog.open) return;
+
+  [
+    suggestBarsCountInput,
+    suggestBeamCountInput,
+    suggestBoxVaultCountInput,
+    suggestFloorCountInput,
+    suggestVaultCountInput,
+  ].forEach((input) => {
+    if (input) input.value = "0";
+  });
+
+  const closeDialog = () => {
+    suggestPlannerForm.removeEventListener("submit", handleSubmitSuggestPlanner);
+    suggestPlannerCancelBtn.removeEventListener("click", handleCancelSuggestPlanner);
+    suggestPlannerDialog.removeEventListener("close", handleSuggestPlannerClose);
+    if (suggestPlannerDialog.open) suggestPlannerDialog.close();
+  };
+
+  const handleSuggestPlannerClose = () => {
+    suggestPlannerForm.removeEventListener("submit", handleSubmitSuggestPlanner);
+    suggestPlannerCancelBtn.removeEventListener("click", handleCancelSuggestPlanner);
+    suggestPlannerDialog.removeEventListener("close", handleSuggestPlannerClose);
+  };
+
+  const handleCancelSuggestPlanner = () => {
+    closeDialog();
+  };
+
+  const handleSubmitSuggestPlanner = (event) => {
+    event.preventDefault();
+
+    applySuggestedPlanner({
+      bars: suggestBarsCountInput?.value,
+      beam: suggestBeamCountInput?.value,
+      boxVault: suggestBoxVaultCountInput?.value,
+      floor: suggestFloorCountInput?.value,
+      vault: suggestVaultCountInput?.value,
+    });
+
+    closeDialog();
+  };
+
+  suggestPlannerForm.addEventListener("submit", handleSubmitSuggestPlanner);
+  suggestPlannerCancelBtn.addEventListener("click", handleCancelSuggestPlanner);
+  suggestPlannerDialog.addEventListener("close", handleSuggestPlannerClose);
+  suggestPlannerDialog.showModal();
+  suggestBarsCountInput?.focus();
+}
+
+suggestPlannerBtn?.addEventListener("click", () => {
+  openSuggestPlannerDialog();
+});
+
+measureToolBtn?.addEventListener("click", () => {
+  if (measureToolActive) {
+    setMeasureToolActive(false);
+    setHint(t("hint.measureToolDisabled"));
+    return;
+  }
+  setMeasureToolActive(true);
+  setHint(t("hint.measureFirstPoint"));
+});
+
+alignLeftBtn?.addEventListener("click", () => {
+  const aligned = window.alignSelectedObjects?.("left");
+  if (!aligned) {
+    setHint(t("hint.selectAtLeastTwoAlign"));
+    return;
+  }
+  savePlannerToLocalStorage();
+  setHint(t("hint.alignedLeft"));
+});
+
+alignCenterBtn?.addEventListener("click", () => {
+  const aligned = window.alignSelectedObjects?.("center");
+  if (!aligned) {
+    setHint(t("hint.selectAtLeastTwoAlign"));
+    return;
+  }
+  savePlannerToLocalStorage();
+  setHint(t("hint.alignedCenter"));
+});
+
+rotateCWBtn?.addEventListener("click", () => {
+  const rotated = window.rotateSelectedObjectsAroundGroupCenter?.(90);
+  if (!rotated) {
+    setHint(t("hint.selectAtLeastOneRotate"));
+    return;
+  }
+  savePlannerToLocalStorage();
+  setHint(t("hint.rotatedCW"));
+});
+
+rotateCCWBtn?.addEventListener("click", () => {
+  const rotated = window.rotateSelectedObjectsAroundGroupCenter?.(-90);
+  if (!rotated) {
+    setHint(t("hint.selectAtLeastOneRotate"));
+    return;
+  }
+  savePlannerToLocalStorage();
+  setHint(t("hint.rotatedCCW"));
+});
+
+copySelectionBtn?.addEventListener("click", () => {
+  copySelectedEquipmentToClipboard();
+});
+
+pasteSelectionBtn?.addEventListener("click", () => {
+  pasteCopiedEquipmentFromClipboard();
+});
+
 equipmentTabBtn.addEventListener("click", () => {
   activateSidebarTab("equipment");
 });
@@ -347,6 +1139,93 @@ actionsTabBtn.addEventListener("click", () => {
 
 mapTabBtn.addEventListener("click", () => {
   activateSidebarTab("map");
+});
+
+plannerSelect?.addEventListener("change", async () => {
+  const nextKey = sanitizePlannerKey(plannerSelect.value);
+  setActivePlannerKey(nextKey);
+
+  const saveName = window.buildPlannerSaveName?.(backgroundSelect.value, nextKey)
+    || window.getCurrentMapSaveName?.();
+  const restored = await loadPlannerFromServer(saveName);
+  if (!restored) {
+    switchMapObjects(backgroundSelect.value, { clearStore: true });
+    savePlannerToLocalStorage();
+    setHint(t("hint.newPlannerBlankLoaded", { planner: plannerDisplayName(nextKey) }));
+  }
+  await refreshPlannerOptions(nextKey);
+});
+
+newPlannerBtn?.addEventListener("click", async () => {
+  const input = window.prompt(t("prompt.newPlannerName"), "");
+  if (input == null) return;
+
+  const nextKey = sanitizePlannerKey(input);
+  setActivePlannerKey(nextKey);
+  if (plannerSelect) {
+    const exists = [...plannerSelect.options].some((option) => option.value === nextKey);
+    if (!exists) {
+      const option = document.createElement("option");
+      option.value = nextKey;
+      option.textContent = plannerDisplayName(nextKey);
+      plannerSelect.appendChild(option);
+    }
+    plannerSelect.value = nextKey;
+  }
+
+  switchMapObjects(backgroundSelect.value, { clearStore: true });
+  savePlannerToLocalStorage();
+  await savePlannerToServer(undefined, { silent: true });
+  await refreshPlannerOptions(nextKey);
+  setHint(t("hint.newPlannerCreated", { planner: plannerDisplayName(nextKey) }));
+});
+
+deletePlannerBtn?.addEventListener("click", async () => {
+  const src = backgroundSelect?.value || "";
+  const plannerKey = sanitizePlannerKey(plannerSelect?.value || currentPlannerKey);
+  const plannerName = plannerDisplayName(plannerKey);
+  const confirmed = window.confirm(t("confirm.deletePlanner", { planner: plannerName }));
+  if (!confirmed) {
+    setHint(t("hint.plannerDeleteCanceled"));
+    return;
+  }
+
+  const primarySaveName = window.buildPlannerSaveName?.(src, plannerKey);
+  const saveNamesToDelete = [primarySaveName].filter(Boolean);
+  if (plannerKey === APP_DEFAULT_PLANNER_KEY) {
+    const legacySaveName = window.getLegacyMapSaveNameForSrc?.(src);
+    if (legacySaveName && !saveNamesToDelete.includes(legacySaveName)) {
+      saveNamesToDelete.push(legacySaveName);
+    }
+  }
+
+  let deletedAny = false;
+  for (const saveName of saveNamesToDelete) {
+    const deleted = await window.deletePlannerSaveFromServer?.(saveName);
+    deletedAny = deletedAny || Boolean(deleted);
+  }
+
+  if (!deletedAny) {
+    setHint(t("hint.unableDeletePlanner"));
+    return;
+  }
+
+  await refreshPlannerOptions(APP_DEFAULT_PLANNER_KEY);
+  const fallbackPlanner = sanitizePlannerKey(plannerSelect?.value || APP_DEFAULT_PLANNER_KEY);
+  setActivePlannerKey(fallbackPlanner);
+  if (plannerSelect) {
+    plannerSelect.value = fallbackPlanner;
+  }
+
+  const fallbackSaveName = window.buildPlannerSaveName?.(src, fallbackPlanner)
+    || window.getCurrentMapSaveName?.();
+  const restored = await loadPlannerFromServer(fallbackSaveName);
+  if (!restored) {
+    switchMapObjects(src, { clearStore: true });
+    savePlannerToLocalStorage();
+  }
+
+  setHint(t("hint.plannerDeleted", { planner: plannerName }));
 });
 
 customEquipmentSelect?.addEventListener("change", () => {
@@ -365,6 +1244,7 @@ const handleCustomEquipmentEdit = () => {
     });
     refreshPlacedObjectsForType(key);
     syncCustomEquipmentEditor(key);
+    void window.saveCustomEquipmentCatalog?.();
     savePlannerToLocalStorage();
     setHint(t("hint.customEquipmentUpdated"));
   } catch (error) {
@@ -393,6 +1273,12 @@ deleteCustomEquipmentBtn?.addEventListener("click", () => {
   }
 
   try {
+    const usageMaps = window.getMapObjectUsageForType?.(key) || [];
+    if (usageMaps.length > 0) {
+      setHint(t("hint.customEquipmentInUseCannotDelete", { count: usageMaps.length }));
+      return;
+    }
+
     roomCanvas.querySelectorAll(`.room-object[data-type="${key}"]`).forEach((obj) => obj.remove());
     if (selectedId && !objectById(selectedId)) {
       selectedId = null;
@@ -400,6 +1286,7 @@ deleteCustomEquipmentBtn?.addEventListener("click", () => {
     }
     deleteCustomEquipmentItem(key);
     syncCustomEquipmentEditor();
+    void window.saveCustomEquipmentCatalog?.();
     savePlannerToLocalStorage();
     setHint(t("hint.customEquipmentDeleted"));
   } catch (error) {
@@ -407,56 +1294,28 @@ deleteCustomEquipmentBtn?.addEventListener("click", () => {
   }
 });
 
-dividerBtn?.addEventListener("click", () => {
-  addDivider();
-});
-
 deleteBtn.addEventListener("click", () => {
-  if (selectedId) {
-    const obj = objectById(selectedId);
-    if (!obj) return;
-    const savedId = selectedId;
-    pushUndo(() => {
-      sceneEl.appendChild(obj);
-      selectObject(savedId);
-      setHint(t("hint.undoObjectRestored"));
-    });
-    obj.remove();
+  const deleted = window.deleteSelectedObjects?.();
+  if (deleted) {
+    savePlannerToLocalStorage();
     setHint(t("hint.objectRemoved"));
-    selectedId = null;
     return;
   }
-  if (removeSelectedDivider()) {
-    setHint(t("hint.dividerRemoved"));
-    return;
-  }
-  setHint(t("hint.selectObjectOrDividerDelete"));
+  setHint(t("hint.selectObjectDelete"));
 });
 
 clearBtn.addEventListener("click", () => {
-  const savedObjects  = [...roomCanvas.querySelectorAll(".room-object")];
-  const savedDividers = [...dividers];
+  const savedObjects = window.getAllSceneItems?.() || [];
   pushUndo(() => {
     savedObjects.forEach((obj) => sceneEl.appendChild(obj));
-    savedDividers.forEach((d) => {
-      dividers.push(d);
-      sceneEl.appendChild(d.lineEl);
-      roomCanvas.appendChild(d.rotateTop);
-      roomCanvas.appendChild(d.rotateBottom);
-      renderDivider(d);
-    });
-    selectedId        = null;
-    selectedDividerId = null;
+    selectedId = null;
     setHint(t("hint.undoRoomRestored"));
   });
   savedObjects.forEach((obj) => obj.remove());
-  dividers.splice(0).forEach((d) => {
-    d.lineEl.remove();
-    d.rotateTop.remove();
-    d.rotateBottom.remove();
-  });
-  selectedId        = null;
-  selectedDividerId = null;
+  selectedId = null;
+  setMeasureToolActive(false);
+  window.clearCurrentMapObjectsStore?.();
+  savePlannerToLocalStorage();
   setHint(t("hint.roomCleared"));
 });
 
@@ -472,6 +1331,7 @@ window.addEventListener("resize", () => {
 // Background selector
 
 backgroundSelect.addEventListener("change", async () => {
+  setMeasureToolActive(false);
   const newSrc = backgroundSelect.value;
 
   if (newSrc.startsWith(SAVED_MAP_OPTION_PREFIX)) {
@@ -492,10 +1352,16 @@ backgroundSelect.addEventListener("change", async () => {
   clampBackgroundPan();
   renderBackgroundView();
   syncCustomMapEditor();
+  await refreshPlannerOptions(plannerSelectionByMap[newSrc] || APP_DEFAULT_PLANNER_KEY);
+  const saveName = window.buildPlannerSaveName?.(newSrc, plannerSelectionByMap[newSrc] || APP_DEFAULT_PLANNER_KEY);
+  const restored = await loadPlannerFromServer(saveName);
+  if (!restored) {
+    switchMapObjects(newSrc, { clearStore: true });
+  }
+  await refreshSavedMapOptions();
   setHint(t("hint.backgroundUpdated"));
 });
 
-// ---------------------------------------------------------------------------
 // Initialise
 // ---------------------------------------------------------------------------
 // Undo button and keyboard hotkeys
@@ -510,6 +1376,21 @@ savePlannerBtn.addEventListener("click", async () => {
 
 document.addEventListener("keydown", (event) => {
   if (event.target.matches("input, select, textarea")) return;
+  const isCopyModifier = event.ctrlKey || event.metaKey;
+  const key = String(event.key || "").toLowerCase();
+
+  if (isCopyModifier && key === "c") {
+    event.preventDefault();
+    copySelectedEquipmentToClipboard();
+    return;
+  }
+
+  if (isCopyModifier && key === "v") {
+    event.preventDefault();
+    pasteCopiedEquipmentFromClipboard();
+    return;
+  }
+
   if (event.key === "Delete" || event.key === "Backspace") {
     deleteBtn.click();
   }
@@ -523,6 +1404,11 @@ document.addEventListener("keydown", (event) => {
 // Try server save first (shared persistent storage), fall back to localStorage.
 (async () => {
   try {
+    let restoredCustomEquipment = await window.loadCustomEquipmentFromServer?.();
+    if (!restoredCustomEquipment) {
+      restoredCustomEquipment = window.loadCustomEquipmentFromLocalStorage?.();
+    }
+
     let restored = await loadPlannerFromServer();
     if (!restored) restored = loadPlannerFromLocalStorage();
     syncCustomEquipmentEditor();
