@@ -85,7 +85,7 @@ const LEGACY_COLOR_TO_TEXTURE = {
 };
 let customBackgroundConfig = null;
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyCXrRVXt6ZG1C4uqrp-nwsB1Ybaxyqg4Cw";
+const GOOGLE_MAPS_API_KEY = String(window.APP_CONFIG?.GOOGLE_MAPS_API_KEY || "").trim();
 const GOOGLE_STATIC_MAP_SIZE = 640;
 const MAX_GOOGLE_MAP_CM = 20000;
 let googleMapsApiPromise = null;
@@ -1024,6 +1024,9 @@ function metersPerPixelAtLatitude(latitude, zoom) {
 }
 
 function loadGoogleMapsApi() {
+  if (!GOOGLE_MAPS_API_KEY) {
+    return Promise.reject(new Error("Google Maps API key is not configured. Set APP_CONFIG.GOOGLE_MAPS_API_KEY in js/config.local.js"));
+  }
   if (window.google?.maps?.Map) {
     return Promise.resolve(window.google.maps);
   }
