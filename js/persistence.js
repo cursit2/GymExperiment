@@ -52,6 +52,13 @@ function cloneMapObjectsState(state) {
             y2: Number(annotation?.y2) || 0,
           };
         }
+        if (annotation?.kind === "area-measure" && Array.isArray(annotation?.pts) && annotation.pts.length === 4) {
+          return {
+            id: annotation?.id,
+            kind: "area-measure",
+            pts: annotation.pts.map((p) => ({ x: Number(p?.x) || 0, y: Number(p?.y) || 0 })),
+          };
+        }
         return {
           id: annotation?.id,
           kind: "note",
@@ -63,7 +70,7 @@ function cloneMapObjectsState(state) {
           color: String(annotation?.color || "#fff5bf"),
         };
       })
-      .filter((annotation) => (annotation.kind === "measure"
+      .filter((annotation) => (annotation.kind === "measure" || annotation.kind === "area-measure"
         ? true
         : annotation.text.length > 0))
     : [];

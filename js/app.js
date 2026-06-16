@@ -7,6 +7,7 @@ const importGoogleMapBtn = document.getElementById("importGoogleMapBtn");
 const addNoteBtn = document.getElementById("addNoteBtn");
 const suggestPlannerBtn = document.getElementById("suggestPlannerBtn");
 const measureToolBtn = document.getElementById("measureToolBtn");
+const measureAreaBtn = document.getElementById("measureAreaBtn");
 const toggleMouseModeBtn = document.getElementById("toggleMouseModeBtn");
 const alignLeftBtn = document.getElementById("alignLeftBtn");
 const alignCenterBtn = document.getElementById("alignCenterBtn");
@@ -47,6 +48,8 @@ const APP_DEFAULT_PLANNER_KEY = "default";
 const SAVED_MAP_OPTION_PREFIX = "save:";
 let measureToolActive = false;
 let pendingMeasurePoint = null;
+let measureAreaToolActive = false;
+let pendingAreaPoints = [];
 let copiedEquipmentSnapshot = null;
 let pasteNudgeCount = 0;
 let mouseInteractionMode = "drag";
@@ -128,6 +131,14 @@ function setMeasureToolActive(active) {
   pendingMeasurePoint = null;
   if (measureToolBtn) {
     measureToolBtn.dataset.active = String(measureToolActive);
+  }
+}
+
+function setMeasureAreaToolActive(active) {
+  measureAreaToolActive = Boolean(active);
+  pendingAreaPoints = [];
+  if (measureAreaBtn) {
+    measureAreaBtn.dataset.active = String(measureAreaToolActive);
   }
 }
 
@@ -543,6 +554,46 @@ roomCanvas.addEventListener("pointercancel", (event) => {
   if (!selectionBoxState || selectionBoxState.pointerId !== event.pointerId) return;
   selectionMarqueeEl.hidden = true;
   selectionBoxState = null;
+});
+
+roomCanvas.addEventListener("pointerdown", (event) => {
+  if (!measureAreaToolActive) return;
+  if (event.target.closest(".room-object, .planner-note")) return;
+
+  const scenePoint = clientToSceneCoords(event.clientX, event.clientY);
+  pendingAreaPoints.push(scenePoint);
+  const n = pendingAreaPoints.length;
+
+  if (n < 4) {
+    setHint(t("hint.measureAreaPoint", { n: n + 1 }));
+    event.preventDefault();
+    return;
+  }
+
+  // All 4 corners collected
+  const pts = pendingAreaPoints.slice();
+  const created = createAreaMeasurementAnnotation(pts);
+  if (created) {
+    pushUndo(() => {
+      created.remove();
+      savePlannerToLocalStorage();
+      setHint(t("hint.undoAnnotationRemoved"));
+    });
+  }
+
+  // Shoelace area
+  let area = 0;
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    area += pts[i].x * pts[j].y;
+    area -= pts[j].x * pts[i].y;
+  }
+  const areaSqM = (Math.abs(area) / 2 / 10000).toFixed(2);
+
+  setMeasureAreaToolActive(false);
+  savePlannerToLocalStorage();
+  setHint(t("hint.measureAreaAdded", { sqm: areaSqM }));
+  event.preventDefault();
 });
 
 roomCanvas.addEventListener("pointerdown", (event) => {
@@ -1077,8 +1128,20 @@ measureToolBtn?.addEventListener("click", () => {
     setHint(t("hint.measureToolDisabled"));
     return;
   }
+  setMeasureAreaToolActive(false);
   setMeasureToolActive(true);
   setHint(t("hint.measureFirstPoint"));
+});
+
+measureAreaBtn?.addEventListener("click", () => {
+  if (measureAreaToolActive) {
+    setMeasureAreaToolActive(false);
+    setHint(t("hint.measureAreaToolDisabled"));
+    return;
+  }
+  setMeasureToolActive(false);
+  setMeasureAreaToolActive(true);
+  setHint(t("hint.measureAreaPoint", { n: 1 }));
 });
 
 alignLeftBtn?.addEventListener("click", () => {

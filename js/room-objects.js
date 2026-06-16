@@ -12,13 +12,17 @@ let noteResizeState = null;
 const selectedIds = new Set();
 
 function objectById(id) {
-  return roomCanvas.querySelector(`.room-object[data-id="${id}"], .planner-note[data-annotation-id="${id}"]`);
+  return roomCanvas.querySelector(
+    `.room-object[data-id="${id}"], .planner-note[data-annotation-id="${id}"], .planner-measure[data-annotation-id="${id}"], .planner-area-measure[data-annotation-id="${id}"]`
+  );
 }
 
 function getSelectableId(el) {
   if (!el) return "";
   if (el.classList?.contains("room-object")) return String(el.dataset.id || "");
   if (el.classList?.contains("planner-note")) return String(el.dataset.annotationId || "");
+  if (el.classList?.contains("planner-measure")) return String(el.dataset.annotationId || "");
+  if (el.classList?.contains("planner-area-measure")) return String(el.dataset.annotationId || "");
   return "";
 }
 
@@ -33,7 +37,7 @@ function getSelectedObjects() {
 }
 
 function syncSelectionClasses() {
-  roomCanvas.querySelectorAll(".room-object, .planner-note").forEach((obj) => {
+  roomCanvas.querySelectorAll(".room-object, .planner-note, .planner-measure, .planner-area-measure").forEach((obj) => {
     const itemId = getSelectableId(obj);
     const isSelected = selectedIds.has(itemId);
     obj.classList.toggle("selected", isSelected);
@@ -405,6 +409,50 @@ function createNoteAnnotation(text, x, y, options = {}) {
   return note;
 }
 
+// ---------------------------------------------------------------------------
+// Shared helper: attach drag behaviour to a measure/area-measure corner pin.
+// pinEl      – the DOM div that is the draggable pin
+// getScene   – fn() returning {x, y} current scene coords for this pin
+// setScene   – fn(x, y) that writes the new scene position back to the
+//              annotation's dataset + redraws the annotation
+// getUndo    – fn() returning a snapshot object used by pushUndo
+// applyUndo  – fn(snapshot) that restores the annotation from a snapshot
+function attachMeasurePin(pinEl, getScene, setScene, getUndo, applyUndo) {
+  let pinDragState = null;
+
+  pinEl.addEventListener("pointerdown", (event) => {
+    event.stopPropagation();
+    pinDragState = {
+      pointerId: event.pointerId,
+      snapshot: getUndo(),
+    };
+    pinEl.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  pinEl.addEventListener("pointermove", (event) => {
+    if (!pinDragState || pinDragState.pointerId !== event.pointerId) return;
+    const sp = clientToSceneCoords(event.clientX, event.clientY);
+    setScene(sp.x, sp.y);
+    event.preventDefault();
+  });
+
+  const endDrag = (event) => {
+    if (!pinDragState || pinDragState.pointerId !== event.pointerId) return;
+    const snapshot = pinDragState.snapshot;
+    pinDragState = null;
+    pushUndo(() => {
+      applyUndo(snapshot);
+      savePlannerToLocalStorage();
+      setHint(t("hint.undoMoveRestored"));
+    });
+    savePlannerToLocalStorage();
+  };
+
+  pinEl.addEventListener("pointerup", endDrag);
+  pinEl.addEventListener("pointercancel", endDrag);
+}
+
 function updateMeasureAnnotationElement(el) {
   const x1 = Number(el.dataset.x1) || 0;
   const y1 = Number(el.dataset.y1) || 0;
@@ -415,6 +463,15 @@ function updateMeasureAnnotationElement(el) {
   const distanceCm = Math.sqrt((dx * dx) + (dy * dy));
   const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
 
+  // Update SVG line
+  const svg = el.querySelector("svg");
+  if (svg) {
+    const line = svg.querySelector("line");
+    if (line) {
+      line.setAttribute("x2", String(distanceCm));
+    }
+  }
+
   el.style.left = `${x1}px`;
   el.style.top = `${y1}px`;
   el.style.width = `${distanceCm}px`;
@@ -423,6 +480,12 @@ function updateMeasureAnnotationElement(el) {
   const label = el.querySelector(".planner-measure-label");
   if (label) {
     label.textContent = `${(distanceCm / 100).toFixed(2)} m`;
+  }
+
+  // Move end pin
+  const endPin = el.querySelector(".planner-measure-corner-end");
+  if (endPin) {
+    endPin.style.left = `${distanceCm - 6}px`;
   }
 }
 
@@ -436,12 +499,263 @@ function createMeasurementAnnotation(x1, y1, x2, y2, options = {}) {
   line.dataset.x2 = String(Number(x2) || 0);
   line.dataset.y2 = String(Number(y2) || 0);
 
+  // SVG line
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.style.cssText = "position:absolute;top:0;left:0;width:100%;height:0;overflow:visible;pointer-events:none;";
+  const svgLine = document.createElementNS(svgNS, "line");
+  svgLine.setAttribute("x1", "0");
+  svgLine.setAttribute("y1", "0");
+  svgLine.setAttribute("y2", "0");
+  svgLine.setAttribute("stroke", "#254956");
+  svgLine.setAttribute("stroke-width", "2");
+  svgLine.setAttribute("stroke-dasharray", "6,4");
+  svg.appendChild(svgLine);
+  line.appendChild(svg);
+
+  // Distance label
   const label = document.createElement("span");
   label.className = "planner-measure-label";
   line.appendChild(label);
+
+  // Start pin (index 0)
+  const startPin = document.createElement("div");
+  startPin.className = "planner-measure-corner";
+  startPin.style.left = "-6px";
+  startPin.style.top = "-6px";
+  line.appendChild(startPin);
+
+  // End pin (index 1) — x position filled in by updateMeasureAnnotationElement
+  const endPin = document.createElement("div");
+  endPin.className = "planner-measure-corner planner-measure-corner-end";
+  endPin.style.top = "-6px";
+  line.appendChild(endPin);
+
   updateMeasureAnnotationElement(line);
+
+  // Drag: start pin moves (x1, y1)
+  attachMeasurePin(
+    startPin,
+    () => ({ x: Number(line.dataset.x1), y: Number(line.dataset.y1) }),
+    (sx, sy) => {
+      line.dataset.x1 = String(sx);
+      line.dataset.y1 = String(sy);
+      updateMeasureAnnotationElement(line);
+    },
+    () => ({ x1: Number(line.dataset.x1), y1: Number(line.dataset.y1), x2: Number(line.dataset.x2), y2: Number(line.dataset.y2) }),
+    (snap) => {
+      line.dataset.x1 = String(snap.x1); line.dataset.y1 = String(snap.y1);
+      line.dataset.x2 = String(snap.x2); line.dataset.y2 = String(snap.y2);
+      updateMeasureAnnotationElement(line);
+    },
+  );
+
+  // Drag: end pin moves (x2, y2)
+  attachMeasurePin(
+    endPin,
+    () => ({ x: Number(line.dataset.x2), y: Number(line.dataset.y2) }),
+    (sx, sy) => {
+      line.dataset.x2 = String(sx);
+      line.dataset.y2 = String(sy);
+      updateMeasureAnnotationElement(line);
+    },
+    () => ({ x1: Number(line.dataset.x1), y1: Number(line.dataset.y1), x2: Number(line.dataset.x2), y2: Number(line.dataset.y2) }),
+    (snap) => {
+      line.dataset.x1 = String(snap.x1); line.dataset.y1 = String(snap.y1);
+      line.dataset.x2 = String(snap.x2); line.dataset.y2 = String(snap.y2);
+      updateMeasureAnnotationElement(line);
+    },
+  );
+
   sceneEl.appendChild(line);
   return line;
+}
+
+function updateAreaMeasureAnnotation(el) {
+  const pts = [0, 1, 2, 3].map((i) => ({
+    x: Number(el.dataset[`x${i}`]) || 0,
+    y: Number(el.dataset[`y${i}`]) || 0,
+  }));
+
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+  const w = maxX - minX || 1;
+  const h = maxY - minY || 1;
+
+  el.style.left = `${minX}px`;
+  el.style.top = `${minY}px`;
+  el.style.width = `${w}px`;
+  el.style.height = `${h}px`;
+
+  const polygon = el.querySelector("polygon");
+  if (polygon) {
+    polygon.setAttribute("points", pts.map((p) => `${p.x - minX},${p.y - minY}`).join(" "));
+  }
+
+  const pins = el.querySelectorAll(".planner-area-measure-corner");
+  pins.forEach((pin, i) => {
+    pin.style.left = `${pts[i].x - minX - 6}px`;
+    pin.style.top = `${pts[i].y - minY - 6}px`;
+  });
+
+  const sideLabels = el.querySelectorAll(".planner-measure-label");
+  [[0, 1], [1, 2], [2, 3], [3, 0]].forEach(([a, b], idx) => {
+    const pa = pts[a];
+    const pb = pts[b];
+    const dx = pb.x - pa.x;
+    const dy = pb.y - pa.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const lbl = sideLabels[idx];
+    if (lbl) {
+      lbl.textContent = `${(dist / 100).toFixed(2)} m`;
+      lbl.style.left = `${(pa.x + pb.x) / 2 - minX}px`;
+      lbl.style.top = `${(pa.y + pb.y) / 2 - minY}px`;
+    }
+  });
+
+  let area = 0;
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    area += pts[i].x * pts[j].y;
+    area -= pts[j].x * pts[i].y;
+  }
+  const areaSqM = (Math.abs(area) / 2 / 10000).toFixed(2);
+
+  const cx = pts.reduce((s, p) => s + p.x, 0) / 4 - minX;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / 4 - minY;
+  const areaLabel = el.querySelector(".planner-area-measure-label");
+  if (areaLabel) {
+    areaLabel.textContent = `${areaSqM} m\u00b2`;
+    areaLabel.style.left = `${cx}px`;
+    areaLabel.style.top = `${cy}px`;
+  }
+}
+
+function createAreaMeasurementAnnotation(pts, options = {}) {
+  // pts: [{x,y},{x,y},{x,y},{x,y}] in scene coords — any quadrilateral
+  if (!Array.isArray(pts) || pts.length !== 4) return null;
+
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+  const w = maxX - minX || 1;
+  const h = maxY - minY || 1;
+
+  const el = document.createElement("div");
+  el.className = "planner-annotation planner-area-measure";
+      // Click on the line body (not a pin) selects it for deletion
+      line.style.pointerEvents = "auto";
+      line.addEventListener("pointerdown", (event) => {
+        if (event.target.classList.contains("planner-measure-corner")) return;
+        event.stopPropagation();
+        const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+        const id = line.dataset.annotationId;
+        if (additive) { selectObject(id, { toggle: true, append: true }); } else { selectObject(id); }
+      });
+  el.dataset.annotationId = options.id || nextAnnotationId();
+  el.dataset.annotationType = "area-measure";
+  pts.forEach((p, i) => {
+    el.dataset[`x${i}`] = String(Number(p.x) || 0);
+    el.dataset[`y${i}`] = String(Number(p.y) || 0);
+  });
+
+  el.style.left = `${minX}px`;
+  el.style.top = `${minY}px`;
+  el.style.width = `${w}px`;
+  el.style.height = `${h}px`;
+
+  // SVG polygon
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible;pointer-events:none;";
+  const polygon = document.createElementNS(svgNS, "polygon");
+  polygon.setAttribute("points", pts.map((p) => `${p.x - minX},${p.y - minY}`).join(" "));
+  polygon.setAttribute("fill", "rgba(255,70,120,0.08)");
+  polygon.setAttribute("stroke", "rgba(255,70,120,0.65)");
+  polygon.setAttribute("stroke-width", "2");
+  polygon.setAttribute("stroke-dasharray", "6,4");
+  svg.appendChild(polygon);
+  el.appendChild(svg);
+
+  // Pink corner pins
+  pts.forEach((p, i) => {
+    const pin = document.createElement("div");
+    pin.className = "planner-area-measure-corner";
+    pin.style.left = `${p.x - minX - 6}px`;
+    pin.style.top = `${p.y - minY - 6}px`;
+    el.appendChild(pin);
+
+    attachMeasurePin(
+      pin,
+      () => ({ x: Number(el.dataset[`x${i}`]), y: Number(el.dataset[`y${i}`]) }),
+      (sx, sy) => {
+        el.dataset[`x${i}`] = String(sx);
+        el.dataset[`y${i}`] = String(sy);
+        updateAreaMeasureAnnotation(el);
+      },
+      () => [0, 1, 2, 3].map((k) => ({ x: Number(el.dataset[`x${k}`]), y: Number(el.dataset[`y${k}`]) })),
+      (snap) => {
+        snap.forEach((p2, k) => { el.dataset[`x${k}`] = String(p2.x); el.dataset[`y${k}`] = String(p2.y); });
+        updateAreaMeasureAnnotation(el);
+      },
+    );
+  });
+
+  // Side distance labels
+  [[0, 1], [1, 2], [2, 3], [3, 0]].forEach(([a, b]) => {
+    const pa = pts[a];
+    const pb = pts[b];
+    const dx = pb.x - pa.x;
+    const dy = pb.y - pa.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const sideLabel = document.createElement("span");
+    sideLabel.className = "planner-measure-label";
+    sideLabel.textContent = `${(dist / 100).toFixed(2)} m`;
+    sideLabel.style.position = "absolute";
+    sideLabel.style.left = `${(pa.x + pb.x) / 2 - minX}px`;
+    sideLabel.style.top = `${(pa.y + pb.y) / 2 - minY}px`;
+    sideLabel.style.transform = "translate(-50%, -50%)";
+    el.appendChild(sideLabel);
+  });
+
+  // Area label at centroid
+  let area = 0;
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    area += pts[i].x * pts[j].y;
+    area -= pts[j].x * pts[i].y;
+  }
+  const areaSqM = (Math.abs(area) / 2 / 10000).toFixed(2);
+  const cx = pts.reduce((s, p) => s + p.x, 0) / 4 - minX;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / 4 - minY;
+  const areaLabel = document.createElement("span");
+  areaLabel.className = "planner-area-measure-label";
+  areaLabel.textContent = `${areaSqM} m\u00b2`;
+  areaLabel.style.position = "absolute";
+  areaLabel.style.left = `${cx}px`;
+  areaLabel.style.top = `${cy}px`;
+  areaLabel.style.transform = "translate(-50%, -50%)";
+  el.appendChild(areaLabel);
+
+  sceneEl.appendChild(el);
+
+  // Click on the area body (not a pin) selects it for deletion
+  el.addEventListener("pointerdown", (event) => {
+    if (event.target.classList.contains("planner-area-measure-corner")) return;
+    event.stopPropagation();
+    const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+    const id = el.dataset.annotationId;
+    if (additive) { selectObject(id, { toggle: true, append: true }); } else { selectObject(id); }
+  });
+
+  return el;
 }
 
 function getSceneAnnotationsState() {
@@ -458,6 +772,16 @@ function getSceneAnnotationsState() {
         y1: Number(el.dataset.y1) || 0,
         x2: Number(el.dataset.x2) || 0,
         y2: Number(el.dataset.y2) || 0,
+      };
+    }
+
+    if (el.dataset.annotationType === "area-measure") {
+      return {
+        ...common,
+        pts: [0, 1, 2, 3].map((i) => ({
+          x: Number(el.dataset[`x${i}`]) || 0,
+          y: Number(el.dataset[`y${i}`]) || 0,
+        })),
       };
     }
 
@@ -478,6 +802,10 @@ function restoreSceneAnnotationsState(annotations) {
   list.forEach((item) => {
     if (item?.kind === "measure") {
       createMeasurementAnnotation(item.x1, item.y1, item.x2, item.y2, { id: item.id });
+      return;
+    }
+    if (item?.kind === "area-measure" && Array.isArray(item.pts) && item.pts.length === 4) {
+      createAreaMeasurementAnnotation(item.pts, { id: item.id });
       return;
     }
     createNoteAnnotation(item?.text, item?.x, item?.y, {
@@ -828,6 +1156,7 @@ window.alignSelectedObjects = alignSelectedObjects;
 window.rotateSelectedObjectsAroundGroupCenter = rotateSelectedObjectsAroundGroupCenter;
 window.createNoteAnnotation = createNoteAnnotation;
 window.createMeasurementAnnotation = createMeasurementAnnotation;
+window.createAreaMeasurementAnnotation = createAreaMeasurementAnnotation;
 window.getSceneAnnotationsState = getSceneAnnotationsState;
 window.restoreSceneAnnotationsState = restoreSceneAnnotationsState;
 window.getAllSceneItems = getAllSceneItems;

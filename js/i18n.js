@@ -27,6 +27,7 @@ const I18N = {
     "btn.addNote": "Add Note",
     "btn.suggestPlanner": "Suggest Planner",
     "btn.measureDistance": "Measure Distance",
+    "btn.measureArea": "Measure Area",
     "btn.alignLeft": "Align Left",
     "btn.alignCenter": "Align Center",
     "btn.rotateCW": "Rotate 90° CW",
@@ -135,6 +136,9 @@ const I18N = {
     "hint.measureSecondPoint": "Click the second point to finish measuring.",
     "hint.measureTooShort": "Measurement canceled because points are too close.",
     "hint.measureAdded": "Measurement added: {meters} m.",
+    "hint.measureAreaToolDisabled": "Area measurement tool disabled.",
+    "hint.measureAreaPoint": "Click corner {n} of 4.",
+    "hint.measureAreaAdded": "Area measurement added: {sqm} m².",
     "hint.selectAtLeastTwoAlign": "Select at least two objects to align.",
     "hint.alignedLeft": "Aligned selected objects to the left edge.",
     "hint.rotatedCW": "Rotated selection 90° clockwise around group centre.",
@@ -362,6 +366,9 @@ const I18N = {
     "hint.measureSecondPoint": "2点目をクリックして計測を完了してください。",
     "hint.measureTooShort": "点が近すぎるため計測をキャンセルしました。",
     "hint.measureAdded": "計測を追加しました: {meters} m。",
+    "hint.measureAreaToolDisabled": "面積計測ツールを無効化しました。",
+    "hint.measureAreaPoint": "{n} 点目（全4点）をクリックしてください。",
+    "hint.measureAreaAdded": "面積計測を追加しました: {sqm} m²。",
     "hint.selectAtLeastTwoAlign": "整列するには2つ以上のオブジェクトを選択してください。",
     "hint.alignedLeft": "選択オブジェクトを左端に揃えました。",
     "hint.rotatedCW": "選択を時計回りに90°回転しました。",
@@ -521,6 +528,7 @@ function applyI18n() {
   setText("#addNoteBtn", "btn.addNote");
   setText("#suggestPlannerBtn", "btn.suggestPlanner");
   setText("#measureToolBtn", "btn.measureDistance");
+  setText("#measureAreaBtn", "btn.measureArea");
   setText("#alignLeftBtn", "btn.alignLeft");
   setText("#alignCenterBtn", "btn.alignCenter");
   setText("#rotateCWBtn", "btn.rotateCW");

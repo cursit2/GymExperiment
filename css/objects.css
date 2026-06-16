@@ -94,7 +94,48 @@
 
 .planner-measure {
   height: 0;
-  border-top: 2px dashed #254956;
+  border-top: none;
+  overflow: visible;
+}
+
+.planner-area-measure {
+  transform-origin: top left;
+  transform: none;
+}
+
+.planner-measure.selected,
+.planner-area-measure.selected {
+  outline: 2px solid rgba(31, 106, 116, 0.75);
+  outline-offset: 3px;
+}
+
+.planner-area-measure-corner,
+.planner-measure-corner {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #ff3c82;
+  border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.planner-area-measure-corner:active,
+.planner-measure-corner:active {
+  cursor: grabbing;
+}
+
+.planner-area-measure-label {
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #b0004a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .planner-measure-label {
