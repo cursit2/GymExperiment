@@ -226,6 +226,22 @@
       </form>
     </dialog>
 
+    <dialog id="areaMeasureDialog" class="new-map-dialog" aria-labelledby="areaMeasureDialogTitle">
+      <form id="areaMeasureForm" class="new-map-form" novalidate>
+        <h2 id="areaMeasureDialogTitle">Area Measurement Details</h2>
+        <label for="areaMeasureNameInput">Name</label>
+        <input id="areaMeasureNameInput" type="text" maxlength="80" placeholder="Main Arena" />
+
+        <label for="areaMeasurePriceInput">Price per m²</label>
+        <input id="areaMeasurePriceInput" type="number" min="0" step="0.01" placeholder="0.00" />
+
+        <div class="new-map-actions">
+          <button id="areaMeasureCancelBtn" type="button">Cancel</button>
+          <button id="areaMeasureSaveBtn" type="submit">Apply</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="suggestPlannerDialog" class="new-map-dialog" aria-labelledby="suggestPlannerDialogTitle">
       <form id="suggestPlannerForm" class="new-map-form" novalidate>
         <h2 id="suggestPlannerDialogTitle">Suggest Planner</h2>

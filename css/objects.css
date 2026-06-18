@@ -122,6 +122,17 @@
   touch-action: none;
 }
 
+.measure-preview-dot {
+  position: absolute;
+  z-index: 5;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ff3c82;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
 .planner-area-measure-corner:active,
 .planner-measure-corner:active {
   cursor: grabbing;
@@ -134,8 +145,11 @@
   color: #b0004a;
   font-size: 0.75rem;
   font-weight: 700;
-  white-space: nowrap;
-  pointer-events: none;
+  white-space: pre-line;
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
 }
 
 .planner-measure-label {

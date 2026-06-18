@@ -33,6 +33,11 @@ const newNoteForm = document.getElementById("newNoteForm");
 const newNoteTextInput = document.getElementById("newNoteTextInput");
 const newNoteColorInput = document.getElementById("newNoteColorInput");
 const newNoteCancelBtn = document.getElementById("newNoteCancelBtn");
+const areaMeasureDialog = document.getElementById("areaMeasureDialog");
+const areaMeasureForm = document.getElementById("areaMeasureForm");
+const areaMeasureNameInput = document.getElementById("areaMeasureNameInput");
+const areaMeasurePriceInput = document.getElementById("areaMeasurePriceInput");
+const areaMeasureCancelBtn = document.getElementById("areaMeasureCancelBtn");
 const suggestPlannerDialog = document.getElementById("suggestPlannerDialog");
 const suggestPlannerForm = document.getElementById("suggestPlannerForm");
 const suggestPlannerCancelBtn = document.getElementById("suggestPlannerCancelBtn");
@@ -50,6 +55,7 @@ let measureToolActive = false;
 let pendingMeasurePoint = null;
 let measureAreaToolActive = false;
 let pendingAreaPoints = [];
+const MEASURE_PREVIEW_DOT_CLASS = "measure-preview-dot";
 let copiedEquipmentSnapshot = null;
 let pasteNudgeCount = 0;
 let mouseInteractionMode = "drag";
@@ -129,6 +135,7 @@ function pasteCopiedEquipmentFromClipboard() {
 function setMeasureToolActive(active) {
   measureToolActive = Boolean(active);
   pendingMeasurePoint = null;
+  roomCanvas.querySelectorAll(`.${MEASURE_PREVIEW_DOT_CLASS}[data-measure-preview="distance"]`).forEach((el) => el.remove());
   if (measureToolBtn) {
     measureToolBtn.dataset.active = String(measureToolActive);
   }
@@ -137,9 +144,21 @@ function setMeasureToolActive(active) {
 function setMeasureAreaToolActive(active) {
   measureAreaToolActive = Boolean(active);
   pendingAreaPoints = [];
+  roomCanvas.querySelectorAll(`.${MEASURE_PREVIEW_DOT_CLASS}[data-measure-preview="area"]`).forEach((el) => el.remove());
   if (measureAreaBtn) {
     measureAreaBtn.dataset.active = String(measureAreaToolActive);
   }
+}
+
+function addMeasurePreviewDot(point, kind) {
+  const dot = document.createElement("div");
+  dot.className = MEASURE_PREVIEW_DOT_CLASS;
+  dot.dataset.measurePreview = kind;
+  dot.style.left = `${(Number(point?.x) || 0) - 5}px`;
+  dot.style.top = `${(Number(point?.y) || 0) - 5}px`;
+  const previewLayer = typeof sceneEl !== "undefined" ? sceneEl : roomCanvas;
+  previewLayer.appendChild(dot);
+  return dot;
 }
 
 async function refreshSavedMapOptions() {
@@ -562,6 +581,7 @@ roomCanvas.addEventListener("pointerdown", (event) => {
 
   const scenePoint = clientToSceneCoords(event.clientX, event.clientY);
   pendingAreaPoints.push(scenePoint);
+  addMeasurePreviewDot(scenePoint, "area");
   const n = pendingAreaPoints.length;
 
   if (n < 4) {
@@ -603,6 +623,7 @@ roomCanvas.addEventListener("pointerdown", (event) => {
   const scenePoint = clientToSceneCoords(event.clientX, event.clientY);
   if (!pendingMeasurePoint) {
     pendingMeasurePoint = scenePoint;
+    addMeasurePreviewDot(scenePoint, "distance");
     setHint(t("hint.measureSecondPoint"));
     event.preventDefault();
     return;
@@ -613,6 +634,7 @@ roomCanvas.addEventListener("pointerdown", (event) => {
   const distanceCm = Math.sqrt((dx * dx) + (dy * dy));
   if (distanceCm < 1) {
     pendingMeasurePoint = null;
+    roomCanvas.querySelectorAll(`.${MEASURE_PREVIEW_DOT_CLASS}[data-measure-preview="distance"]`).forEach((el) => el.remove());
     setHint(t("hint.measureTooShort"));
     event.preventDefault();
     return;
@@ -868,6 +890,87 @@ window.openNoteEditorForExistingNote = (noteEl) => {
     initialColor: noteEl.dataset.color || "#fff5bf",
   });
 };
+
+function openAreaMeasureDetailsDialog(areaEl) {
+  if (!areaEl || String(areaEl.dataset.annotationType) !== "area-measure") return;
+  if (!areaMeasureDialog || !areaMeasureForm || !areaMeasureNameInput || !areaMeasurePriceInput) {
+    setHint(t("hint.areaMeasureDialogUnavailable"));
+    return;
+  }
+  if (areaMeasureDialog.open) return;
+
+  areaMeasureNameInput.value = String(areaEl.dataset.areaName || "");
+  const existingPrice = Number(areaEl.dataset.pricePerSqm);
+  areaMeasurePriceInput.value = Number.isFinite(existingPrice) ? String(existingPrice) : "";
+
+  const closeDialog = () => {
+    areaMeasureForm.removeEventListener("submit", handleSubmitAreaMeasure);
+    areaMeasureCancelBtn?.removeEventListener("click", handleCancelAreaMeasure);
+    areaMeasureDialog.removeEventListener("close", handleDialogClose);
+    if (areaMeasureDialog.open) areaMeasureDialog.close();
+  };
+
+  const handleDialogClose = () => {
+    areaMeasureForm.removeEventListener("submit", handleSubmitAreaMeasure);
+    areaMeasureCancelBtn?.removeEventListener("click", handleCancelAreaMeasure);
+    areaMeasureDialog.removeEventListener("close", handleDialogClose);
+  };
+
+  const handleCancelAreaMeasure = () => {
+    closeDialog();
+  };
+
+  const handleSubmitAreaMeasure = (event) => {
+    event.preventDefault();
+
+    const nextName = areaMeasureNameInput.value.trim();
+    const priceRaw = areaMeasurePriceInput.value.trim();
+    if (priceRaw && (!Number.isFinite(Number(priceRaw)) || Number(priceRaw) < 0)) {
+      setHint(t("hint.areaMeasurePriceInvalid"));
+      return;
+    }
+
+    const previousName = String(areaEl.dataset.areaName || "");
+    const previousPriceRaw = String(areaEl.dataset.pricePerSqm || "");
+
+    areaEl.dataset.areaName = nextName;
+    if (priceRaw) {
+      areaEl.dataset.pricePerSqm = String(Number(priceRaw));
+    } else {
+      delete areaEl.dataset.pricePerSqm;
+      delete areaEl.dataset.totalPrice;
+    }
+
+    window.updateAreaMeasurementAnnotation?.(areaEl);
+
+    if (nextName !== previousName || priceRaw !== previousPriceRaw) {
+      pushUndo(() => {
+        areaEl.dataset.areaName = previousName;
+        if (previousPriceRaw) {
+          areaEl.dataset.pricePerSqm = previousPriceRaw;
+        } else {
+          delete areaEl.dataset.pricePerSqm;
+          delete areaEl.dataset.totalPrice;
+        }
+        window.updateAreaMeasurementAnnotation?.(areaEl);
+        savePlannerToLocalStorage();
+        setHint(t("hint.undoAnnotationRemoved"));
+      });
+    }
+
+    savePlannerToLocalStorage();
+    setHint(t("hint.areaMeasureDetailsUpdated"));
+    closeDialog();
+  };
+
+  areaMeasureForm.addEventListener("submit", handleSubmitAreaMeasure);
+  areaMeasureCancelBtn?.addEventListener("click", handleCancelAreaMeasure);
+  areaMeasureDialog.addEventListener("close", handleDialogClose);
+  areaMeasureDialog.showModal();
+  areaMeasureNameInput.focus();
+}
+
+window.openAreaMeasureDetailsDialog = openAreaMeasureDetailsDialog;
 
 addNoteBtn?.addEventListener("click", () => {
   openNoteDialog({

@@ -48,6 +48,7 @@ const I18N = {
     "btn.addItem": "Add Item",
     "btn.importFile": "Import File",
     "btn.resetCrop": "Reset Crop",
+    "btn.apply": "Apply",
 
     "label.background": "Background",
     "label.backgroundZoom": "Background Zoom",
@@ -60,6 +61,7 @@ const I18N = {
     "label.item": "Item",
     "label.lengthCm": "Length (cm)",
     "label.note": "Note",
+    "label.pricePerSqm": "Price per m²",
     "label.countBars": "Bars Count",
     "label.countBeam": "Beam Count",
     "label.countBoxVault": "Box Vault Count",
@@ -70,6 +72,7 @@ const I18N = {
     "title.newMap": "Create New Map",
     "title.newEquipment": "Add Equipment Item",
     "title.newNote": "Add Note",
+    "title.areaMeasureDetails": "Area Measurement Details",
     "title.suggestPlanner": "Suggest Planner",
     "title.importGoogleMap": "Import Google Map Satellite Image",
     "placeholder.newMapName": "My Training Room",
@@ -77,6 +80,8 @@ const I18N = {
     "placeholder.googleMapsLink": "https://maps.google.com/...",
     "placeholder.googleMapName": "Imported Satellite Map",
     "placeholder.noteText": "Enter note text...",
+    "placeholder.areaMeasureName": "Main Arena",
+    "placeholder.areaMeasurePrice": "0.00",
 
     "option.gymFloor": "Gym Floor (2 Courts)",
     "option.indoorGym": "Indoor Gym",
@@ -127,6 +132,9 @@ const I18N = {
     "hint.noteCanceled": "Adding note canceled.",
     "hint.noteEmpty": "Note text cannot be empty.",
     "hint.noteDialogUnavailable": "Note dialog is unavailable.",
+    "hint.areaMeasureDialogUnavailable": "Area details dialog is unavailable.",
+    "hint.areaMeasurePriceInvalid": "Price per m² must be a valid number greater than or equal to 0.",
+    "hint.areaMeasureDetailsUpdated": "Area details updated.",
     "hint.suggestPlannerDialogUnavailable": "Suggest Planner dialog is unavailable.",
     "hint.suggestPlannerNoItems": "Enter at least one equipment count.",
     "hint.suggestPlannerApplied": "Suggested planner applied with {placed} set(s).",
@@ -278,6 +286,7 @@ const I18N = {
     "btn.addItem": "項目を追加",
     "btn.importFile": "ファイルを読み込み",
     "btn.resetCrop": "切り抜きをリセット",
+    "btn.apply": "適用",
 
     "label.background": "背景",
     "label.backgroundZoom": "背景ズーム",
@@ -290,6 +299,7 @@ const I18N = {
     "label.item": "項目",
     "label.lengthCm": "長さ (cm)",
     "label.note": "メモ",
+    "label.pricePerSqm": "1m²あたりの価格",
     "label.countBars": "段違い平行棒の数",
     "label.countBeam": "平均台の数",
     "label.countBoxVault": "跳び箱の数",
@@ -300,6 +310,7 @@ const I18N = {
     "title.newMap": "新しいマップを作成",
     "title.newEquipment": "器具項目を追加",
     "title.newNote": "メモを追加",
+    "title.areaMeasureDetails": "面積計測の詳細",
     "title.suggestPlanner": "プランを提案",
     "title.importGoogleMap": "Googleマップ衛星画像を読み込み",
     "placeholder.newMapName": "練習ルーム",
@@ -307,6 +318,8 @@ const I18N = {
     "placeholder.googleMapsLink": "https://maps.google.com/...",
     "placeholder.googleMapName": "読み込み済み衛星マップ",
     "placeholder.noteText": "メモを入力してください...",
+    "placeholder.areaMeasureName": "メインアリーナ",
+    "placeholder.areaMeasurePrice": "0.00",
 
     "option.gymFloor": "体育館（2コート）",
     "option.indoorGym": "室内体育館",
@@ -357,6 +370,9 @@ const I18N = {
     "hint.noteCanceled": "メモ追加をキャンセルしました。",
     "hint.noteEmpty": "メモのテキストは空にできません。",
     "hint.noteDialogUnavailable": "メモダイアログを使用できません。",
+    "hint.areaMeasureDialogUnavailable": "面積詳細ダイアログを使用できません。",
+    "hint.areaMeasurePriceInvalid": "1m²あたりの価格は0以上の有効な数値で入力してください。",
+    "hint.areaMeasureDetailsUpdated": "面積の詳細を更新しました。",
     "hint.suggestPlannerDialogUnavailable": "プラン提案ダイアログを使用できません。",
     "hint.suggestPlannerNoItems": "少なくとも1つ以上の器具数を入力してください。",
     "hint.suggestPlannerApplied": "提案プランを適用しました（{placed} セット）。",
@@ -554,6 +570,7 @@ function applyI18n() {
   setText("#newMapDialogTitle", "title.newMap");
   setText("#newEquipmentDialogTitle", "title.newEquipment");
   setText("#newNoteDialogTitle", "title.newNote");
+  setText("#areaMeasureDialogTitle", "title.areaMeasureDetails");
   setText("#suggestPlannerDialogTitle", "title.suggestPlanner");
   setText("#importGoogleMapDialogTitle", "title.importGoogleMap");
   setText("#newMapCancelBtn", "btn.cancel");
@@ -562,6 +579,8 @@ function applyI18n() {
   setText("#newEquipmentCreateBtn", "btn.addItem");
   setText("#newNoteCancelBtn", "btn.cancel");
   setText("#newNoteCreateBtn", "btn.addNote");
+  setText("#areaMeasureCancelBtn", "btn.cancel");
+  setText("#areaMeasureSaveBtn", "btn.apply");
   setText("#suggestPlannerCancelBtn", "btn.cancel");
   setText("#suggestPlannerCreateBtn", "btn.suggestPlanner");
   setText("#importGoogleMapFileBtn", "btn.importFile");
@@ -591,6 +610,8 @@ function applyI18n() {
   setLabel("newEquipmentColorInput", "label.color");
   setLabel("newNoteTextInput", "label.note");
   setLabel("newNoteColorInput", "label.color");
+  setLabel("areaMeasureNameInput", "label.name");
+  setLabel("areaMeasurePriceInput", "label.pricePerSqm");
   setLabel("suggestBarsCountInput", "label.countBars");
   setLabel("suggestBeamCountInput", "label.countBeam");
   setLabel("suggestBoxVaultCountInput", "label.countBoxVault");
@@ -608,6 +629,10 @@ function applyI18n() {
   if (googleMapNameInput) googleMapNameInput.placeholder = t("placeholder.googleMapName");
   const newNoteTextInput = document.getElementById("newNoteTextInput");
   if (newNoteTextInput) newNoteTextInput.placeholder = t("placeholder.noteText");
+  const areaMeasureNameInput = document.getElementById("areaMeasureNameInput");
+  if (areaMeasureNameInput) areaMeasureNameInput.placeholder = t("placeholder.areaMeasureName");
+  const areaMeasurePriceInput = document.getElementById("areaMeasurePriceInput");
+  if (areaMeasurePriceInput) areaMeasurePriceInput.placeholder = t("placeholder.areaMeasurePrice");
 
   setOption("backgroundSelect", "assets/gym-floor-topdown-4000x7000cm.svg", "option.gymFloor");
   setOption("customMapTextureSelect", "indoorGym", "option.indoorGym");

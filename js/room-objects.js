@@ -421,6 +421,16 @@ function attachMeasurePin(pinEl, getScene, setScene, getUndo, applyUndo) {
   let pinDragState = null;
 
   pinEl.addEventListener("pointerdown", (event) => {
+    const owner = pinEl.closest(".planner-annotation");
+    const ownerId = owner?.dataset?.annotationId;
+    if (ownerId) {
+      const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+      if (additive) {
+        selectObject(ownerId, { append: true, toggle: true });
+      } else {
+        selectObject(ownerId);
+      }
+    }
     event.stopPropagation();
     pinDragState = {
       pointerId: event.pointerId,
@@ -567,8 +577,43 @@ function createMeasurementAnnotation(x1, y1, x2, y2, options = {}) {
     },
   );
 
+  // Click on the line body (not a pin) selects it for deletion
+  line.style.pointerEvents = "auto";
+  line.addEventListener("pointerdown", (event) => {
+    if (event.target.classList.contains("planner-measure-corner")) return;
+    event.stopPropagation();
+    const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+    const id = line.dataset.annotationId;
+    if (additive) { selectObject(id, { toggle: true, append: true }); } else { selectObject(id); }
+  });
+
   sceneEl.appendChild(line);
   return line;
+}
+
+function formatAreaCenterLabel(el, areaSqMValue) {
+  const areaSqM = Number.isFinite(Number(areaSqMValue)) ? Number(areaSqMValue) : 0;
+  const name = String(el.dataset.areaName || "").trim();
+  const pricePerSqM = Number(el.dataset.pricePerSqm);
+  const hasPrice = Number.isFinite(pricePerSqM) && pricePerSqM >= 0;
+  const totalPrice = hasPrice ? areaSqM * pricePerSqM : null;
+  const yenFormatter = new Intl.NumberFormat("ja-JP", {
+    style: "currency",
+    currency: "JPY",
+    maximumFractionDigits: 0,
+  });
+
+  if (hasPrice) {
+    el.dataset.totalPrice = String(totalPrice);
+  } else {
+    delete el.dataset.totalPrice;
+  }
+
+  const lines = [];
+  if (name) lines.push(name);
+  lines.push(`${areaSqM.toFixed(2)} m\u00b2`);
+  if (hasPrice) lines.push(`Total: ${yenFormatter.format(totalPrice)}`);
+  return lines.join("\n");
 }
 
 function updateAreaMeasureAnnotation(el) {
@@ -629,7 +674,7 @@ function updateAreaMeasureAnnotation(el) {
   const cy = pts.reduce((s, p) => s + p.y, 0) / 4 - minY;
   const areaLabel = el.querySelector(".planner-area-measure-label");
   if (areaLabel) {
-    areaLabel.textContent = `${areaSqM} m\u00b2`;
+    areaLabel.textContent = formatAreaCenterLabel(el, Number(areaSqM));
     areaLabel.style.left = `${cx}px`;
     areaLabel.style.top = `${cy}px`;
   }
@@ -650,17 +695,13 @@ function createAreaMeasurementAnnotation(pts, options = {}) {
 
   const el = document.createElement("div");
   el.className = "planner-annotation planner-area-measure";
-      // Click on the line body (not a pin) selects it for deletion
-      line.style.pointerEvents = "auto";
-      line.addEventListener("pointerdown", (event) => {
-        if (event.target.classList.contains("planner-measure-corner")) return;
-        event.stopPropagation();
-        const additive = event.shiftKey || event.ctrlKey || event.metaKey;
-        const id = line.dataset.annotationId;
-        if (additive) { selectObject(id, { toggle: true, append: true }); } else { selectObject(id); }
-      });
   el.dataset.annotationId = options.id || nextAnnotationId();
   el.dataset.annotationType = "area-measure";
+  el.dataset.areaName = String(options.areaName || "").trim();
+  const inputPrice = Number(options.pricePerSqm);
+  if (Number.isFinite(inputPrice) && inputPrice >= 0) {
+    el.dataset.pricePerSqm = String(inputPrice);
+  }
   pts.forEach((p, i) => {
     el.dataset[`x${i}`] = String(Number(p.x) || 0);
     el.dataset[`y${i}`] = String(Number(p.y) || 0);
@@ -737,11 +778,16 @@ function createAreaMeasurementAnnotation(pts, options = {}) {
   const cy = pts.reduce((s, p) => s + p.y, 0) / 4 - minY;
   const areaLabel = document.createElement("span");
   areaLabel.className = "planner-area-measure-label";
-  areaLabel.textContent = `${areaSqM} m\u00b2`;
+  areaLabel.textContent = formatAreaCenterLabel(el, Number(areaSqM));
   areaLabel.style.position = "absolute";
   areaLabel.style.left = `${cx}px`;
   areaLabel.style.top = `${cy}px`;
   areaLabel.style.transform = "translate(-50%, -50%)";
+  areaLabel.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    window.openAreaMeasureDetailsDialog?.(el);
+  });
   el.appendChild(areaLabel);
 
   sceneEl.appendChild(el);
@@ -782,6 +828,13 @@ function getSceneAnnotationsState() {
           x: Number(el.dataset[`x${i}`]) || 0,
           y: Number(el.dataset[`y${i}`]) || 0,
         })),
+        areaName: String(el.dataset.areaName || ""),
+        pricePerSqm: Number.isFinite(Number(el.dataset.pricePerSqm))
+          ? Number(el.dataset.pricePerSqm)
+          : null,
+        totalPrice: Number.isFinite(Number(el.dataset.totalPrice))
+          ? Number(el.dataset.totalPrice)
+          : null,
       };
     }
 
@@ -805,7 +858,11 @@ function restoreSceneAnnotationsState(annotations) {
       return;
     }
     if (item?.kind === "area-measure" && Array.isArray(item.pts) && item.pts.length === 4) {
-      createAreaMeasurementAnnotation(item.pts, { id: item.id });
+      createAreaMeasurementAnnotation(item.pts, {
+        id: item.id,
+        areaName: item.areaName,
+        pricePerSqm: item.pricePerSqm,
+      });
       return;
     }
     createNoteAnnotation(item?.text, item?.x, item?.y, {
@@ -1157,6 +1214,7 @@ window.rotateSelectedObjectsAroundGroupCenter = rotateSelectedObjectsAroundGroup
 window.createNoteAnnotation = createNoteAnnotation;
 window.createMeasurementAnnotation = createMeasurementAnnotation;
 window.createAreaMeasurementAnnotation = createAreaMeasurementAnnotation;
+window.updateAreaMeasurementAnnotation = updateAreaMeasureAnnotation;
 window.getSceneAnnotationsState = getSceneAnnotationsState;
 window.restoreSceneAnnotationsState = restoreSceneAnnotationsState;
 window.getAllSceneItems = getAllSceneItems;

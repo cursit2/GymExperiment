@@ -57,6 +57,13 @@ function cloneMapObjectsState(state) {
             id: annotation?.id,
             kind: "area-measure",
             pts: annotation.pts.map((p) => ({ x: Number(p?.x) || 0, y: Number(p?.y) || 0 })),
+            areaName: String(annotation?.areaName || ""),
+            pricePerSqm: Number.isFinite(Number(annotation?.pricePerSqm))
+              ? Number(annotation?.pricePerSqm)
+              : null,
+            totalPrice: Number.isFinite(Number(annotation?.totalPrice))
+              ? Number(annotation?.totalPrice)
+              : null,
           };
         }
         return {

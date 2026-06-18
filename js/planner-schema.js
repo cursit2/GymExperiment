@@ -38,6 +38,24 @@
           };
         }
 
+        if (annotation?.kind === "area-measure") {
+          const rawPts = Array.isArray(annotation?.pts) ? annotation.pts : [];
+          if (rawPts.length !== 4) return null;
+          const pricePerSqm = Number(annotation?.pricePerSqm);
+          const totalPrice = Number(annotation?.totalPrice);
+          return {
+            id: annotation?.id,
+            kind: "area-measure",
+            pts: rawPts.map((pt) => ({
+              x: toFiniteNumber(pt?.x, 0),
+              y: toFiniteNumber(pt?.y, 0),
+            })),
+            areaName: String(annotation?.areaName || ""),
+            pricePerSqm: Number.isFinite(pricePerSqm) ? pricePerSqm : null,
+            totalPrice: Number.isFinite(totalPrice) ? totalPrice : null,
+          };
+        }
+
         const text = String(annotation?.text || "").trim();
         if (!text) return null;
 
