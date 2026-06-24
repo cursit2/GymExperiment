@@ -28,6 +28,7 @@ const I18N = {
     "btn.suggestPlanner": "Suggest Planner",
     "btn.measureDistance": "Measure Distance",
     "btn.measureArea": "Measure Area",
+    "btn.calibrateScale": "Calibrate Scale",
     "btn.alignLeft": "Align Left",
     "btn.alignCenter": "Align Center",
     "btn.rotateCW": "Rotate 90° CW",
@@ -147,6 +148,14 @@ const I18N = {
     "hint.measureAreaToolDisabled": "Area measurement tool disabled.",
     "hint.measureAreaPoint": "Click corner {n} of 4.",
     "hint.measureAreaAdded": "Area measurement added: {sqm} m².",
+    "hint.calibrationToolDisabled": "Scale calibration tool disabled.",
+    "hint.calibrationFirstPoint": "Scale calibration active. Click the first point.",
+    "hint.calibrationSecondPoint": "Click the second point to calibrate scale.",
+    "hint.calibrationTooShort": "Calibration canceled because points are too close.",
+    "hint.calibrationDistanceInvalid": "Enter a valid known distance greater than 0.",
+    "hint.calibrationCanceled": "Scale calibration canceled.",
+    "hint.calibrationApplied": "Scale calibrated ({factor}x). Map size is now {width}x{height} cm.",
+    "hint.calibrationSelectCustomMap": "Select a custom/imported map before calibrating scale.",
     "hint.selectAtLeastTwoAlign": "Select at least two objects to align.",
     "hint.alignedLeft": "Aligned selected objects to the left edge.",
     "hint.rotatedCW": "Rotated selection 90° clockwise around group centre.",
@@ -226,6 +235,7 @@ const I18N = {
 
     "prompt.noteText": "Enter note text:",
     "prompt.newPlannerName": "Enter planner name:",
+    "prompt.calibrationDistanceMeters": "Current measured distance is {measured} m. Enter the real-world distance in meters:",
 
     "error.unableReadImageData": "Unable to read image data.",
     "error.failedReadSelectedFile": "Failed to read the selected file.",
@@ -266,6 +276,8 @@ const I18N = {
     "btn.addNote": "メモを追加",
     "btn.suggestPlanner": "プランを提案",
     "btn.measureDistance": "距離を計測",
+    "btn.measureArea": "面積を計測",
+    "btn.calibrateScale": "縮尺を補正",
     "btn.alignLeft": "左揃え",
     "btn.alignCenter": "中央揃え",
     "btn.rotateCW": "右に90°回転",
@@ -385,6 +397,14 @@ const I18N = {
     "hint.measureAreaToolDisabled": "面積計測ツールを無効化しました。",
     "hint.measureAreaPoint": "{n} 点目（全4点）をクリックしてください。",
     "hint.measureAreaAdded": "面積計測を追加しました: {sqm} m²。",
+    "hint.calibrationToolDisabled": "縮尺補正ツールを無効化しました。",
+    "hint.calibrationFirstPoint": "縮尺補正ツールを有効化しました。1点目をクリックしてください。",
+    "hint.calibrationSecondPoint": "2点目をクリックして縮尺を補正してください。",
+    "hint.calibrationTooShort": "点が近すぎるため縮尺補正をキャンセルしました。",
+    "hint.calibrationDistanceInvalid": "0より大きい実距離を入力してください。",
+    "hint.calibrationCanceled": "縮尺補正をキャンセルしました。",
+    "hint.calibrationApplied": "縮尺を補正しました（{factor}倍）。マップサイズは {width}x{height} cm です。",
+    "hint.calibrationSelectCustomMap": "縮尺補正の前にカスタム/読み込みマップを選択してください。",
     "hint.selectAtLeastTwoAlign": "整列するには2つ以上のオブジェクトを選択してください。",
     "hint.alignedLeft": "選択オブジェクトを左端に揃えました。",
     "hint.rotatedCW": "選択を時計回りに90°回転しました。",
@@ -464,6 +484,7 @@ const I18N = {
 
     "prompt.noteText": "メモのテキストを入力してください:",
     "prompt.newPlannerName": "プランナー名を入力してください:",
+    "prompt.calibrationDistanceMeters": "現在の計測値は {measured} m です。実際の距離（m）を入力してください:",
 
     "error.unableReadImageData": "画像データを読み取れません。",
     "error.failedReadSelectedFile": "選択したファイルを読み取れませんでした。",
@@ -545,6 +566,7 @@ function applyI18n() {
   setText("#suggestPlannerBtn", "btn.suggestPlanner");
   setText("#measureToolBtn", "btn.measureDistance");
   setText("#measureAreaBtn", "btn.measureArea");
+  setText("#calibrateScaleBtn", "btn.calibrateScale");
   setText("#alignLeftBtn", "btn.alignLeft");
   setText("#alignCenterBtn", "btn.alignCenter");
   setText("#rotateCWBtn", "btn.rotateCW");

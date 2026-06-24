@@ -8,6 +8,7 @@ const addNoteBtn = document.getElementById("addNoteBtn");
 const suggestPlannerBtn = document.getElementById("suggestPlannerBtn");
 const measureToolBtn = document.getElementById("measureToolBtn");
 const measureAreaBtn = document.getElementById("measureAreaBtn");
+const calibrateScaleBtn = document.getElementById("calibrateScaleBtn");
 const toggleMouseModeBtn = document.getElementById("toggleMouseModeBtn");
 const alignLeftBtn = document.getElementById("alignLeftBtn");
 const alignCenterBtn = document.getElementById("alignCenterBtn");
@@ -55,6 +56,8 @@ let measureToolActive = false;
 let pendingMeasurePoint = null;
 let measureAreaToolActive = false;
 let pendingAreaPoints = [];
+let scaleCalibrationToolActive = false;
+let pendingScaleCalibrationPoint = null;
 const MEASURE_PREVIEW_DOT_CLASS = "measure-preview-dot";
 let copiedEquipmentSnapshot = null;
 let pasteNudgeCount = 0;
@@ -147,6 +150,15 @@ function setMeasureAreaToolActive(active) {
   roomCanvas.querySelectorAll(`.${MEASURE_PREVIEW_DOT_CLASS}[data-measure-preview="area"]`).forEach((el) => el.remove());
   if (measureAreaBtn) {
     measureAreaBtn.dataset.active = String(measureAreaToolActive);
+  }
+}
+
+function setScaleCalibrationToolActive(active) {
+  scaleCalibrationToolActive = Boolean(active);
+  pendingScaleCalibrationPoint = null;
+  roomCanvas.querySelectorAll(`.${MEASURE_PREVIEW_DOT_CLASS}[data-measure-preview="calibration"]`).forEach((el) => el.remove());
+  if (calibrateScaleBtn) {
+    calibrateScaleBtn.dataset.active = String(scaleCalibrationToolActive);
   }
 }
 
@@ -661,7 +673,71 @@ roomCanvas.addEventListener("pointerdown", (event) => {
 });
 
 roomCanvas.addEventListener("pointerdown", (event) => {
+  if (!scaleCalibrationToolActive) return;
+  if (event.target.closest(".room-object, .planner-note")) return;
+
+  const scenePoint = clientToSceneCoords(event.clientX, event.clientY);
+  if (!pendingScaleCalibrationPoint) {
+    pendingScaleCalibrationPoint = scenePoint;
+    addMeasurePreviewDot(scenePoint, "calibration");
+    setHint(t("hint.calibrationSecondPoint"));
+    event.preventDefault();
+    return;
+  }
+
+  addMeasurePreviewDot(scenePoint, "calibration");
+  const dx = scenePoint.x - pendingScaleCalibrationPoint.x;
+  const dy = scenePoint.y - pendingScaleCalibrationPoint.y;
+  const measuredDistanceCm = Math.sqrt((dx * dx) + (dy * dy));
+  if (measuredDistanceCm < 1) {
+    pendingScaleCalibrationPoint = null;
+    roomCanvas.querySelectorAll(`.${MEASURE_PREVIEW_DOT_CLASS}[data-measure-preview="calibration"]`).forEach((el) => el.remove());
+    setHint(t("hint.calibrationTooShort"));
+    event.preventDefault();
+    return;
+  }
+
+  const promptText = t("prompt.calibrationDistanceMeters", {
+    measured: (measuredDistanceCm / 100).toFixed(2),
+  });
+  const distanceInput = window.prompt(promptText, "");
+  if (distanceInput == null) {
+    setScaleCalibrationToolActive(false);
+    setHint(t("hint.calibrationCanceled"));
+    event.preventDefault();
+    return;
+  }
+
+  const knownMeters = Number(distanceInput);
+  if (!Number.isFinite(knownMeters) || knownMeters <= 0) {
+    pendingScaleCalibrationPoint = null;
+    roomCanvas.querySelectorAll(`.${MEASURE_PREVIEW_DOT_CLASS}[data-measure-preview="calibration"]`).forEach((el) => el.remove());
+    setHint(t("hint.calibrationDistanceInvalid"));
+    event.preventDefault();
+    return;
+  }
+
+  const factor = (knownMeters * 100) / measuredDistanceCm;
+  const result = window.applyCurrentMapScaleCalibration?.(factor);
+  if (!result) {
+    setScaleCalibrationToolActive(false);
+    event.preventDefault();
+    return;
+  }
+
+  setScaleCalibrationToolActive(false);
+  savePlannerToLocalStorage();
+  setHint(t("hint.calibrationApplied", {
+    factor: factor.toFixed(4),
+    width: result.width,
+    height: result.height,
+  }));
+  event.preventDefault();
+});
+
+roomCanvas.addEventListener("pointerdown", (event) => {
   if (mouseInteractionMode === "select") return;
+  if (measureToolActive || measureAreaToolActive || scaleCalibrationToolActive) return;
   if (!backgroundState.moveMode) return;
   if (event.target.closest(".room-object, .planner-note")) return;
 
@@ -1232,6 +1308,7 @@ measureToolBtn?.addEventListener("click", () => {
     return;
   }
   setMeasureAreaToolActive(false);
+  setScaleCalibrationToolActive(false);
   setMeasureToolActive(true);
   setHint(t("hint.measureFirstPoint"));
 });
@@ -1243,8 +1320,21 @@ measureAreaBtn?.addEventListener("click", () => {
     return;
   }
   setMeasureToolActive(false);
+  setScaleCalibrationToolActive(false);
   setMeasureAreaToolActive(true);
   setHint(t("hint.measureAreaPoint", { n: 1 }));
+});
+
+calibrateScaleBtn?.addEventListener("click", () => {
+  if (scaleCalibrationToolActive) {
+    setScaleCalibrationToolActive(false);
+    setHint(t("hint.calibrationToolDisabled"));
+    return;
+  }
+  setMeasureToolActive(false);
+  setMeasureAreaToolActive(false);
+  setScaleCalibrationToolActive(true);
+  setHint(t("hint.calibrationFirstPoint"));
 });
 
 alignLeftBtn?.addEventListener("click", () => {

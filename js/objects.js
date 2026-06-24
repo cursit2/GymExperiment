@@ -1,14 +1,28 @@
 const DEFAULT_OBJECT_CATALOG = {
-  bars:        { label: "Bars",        width: 240,  height: 120,  color: "#b38d58", image: "assets/equipment/bars.svg" },
-  beam:        { label: "Beam",        width: 500,  height: 20,   color: "#c7a36f", image: "assets/equipment/beam.svg" },
-  boxVault:    { label: "Box Vault",   width: 120,  height: 90,   color: "#a865cf", image: "assets/equipment/box-vault.svg" },
-  floor:       { label: "Floor",       width: 1200, height: 1200, color: "#9ec8d8", image: "assets/equipment/floor.svg" },
-  springboard: { label: "Springboard", width: 60,   height: 120,  color: "#d39a5f", image: "assets/equipment/springboard.svg" },
-  vault:       { label: "Vault",       width: 100,  height: 120,  color: "#d9a675", image: "assets/equipment/vault.svg" },
-  mat:         { label: "Mat",         width: 200,  height: 120,  color: "#8ec2a2", image: "assets/equipment/mat.svg" },
+  bars:           { label: "Bars",        width: 240,  height: 120,  color: "#b38d58", image: "assets/equipment/bars.svg" },
+  beam:           { label: "Beam",        width: 500,  height: 20,   color: "#c7a36f", image: "assets/equipment/beam.svg" },
+  floor:          { label: "Floor",       width: 1200, height: 1200, color: "#9ec8d8", image: "assets/equipment/floor.svg" },
+  vault:          { label: "Vault",       width: 100,  height: 120,  color: "#d9a675", image: "assets/equipment/vault.svg" },
+  boxVault:       { label: "Box Vault",   width: 120,  height: 90,   color: "#a865cf", image: "assets/equipment/box-vault.svg" },
+  springboard:    { label: "Springboard", width: 60,   height: 120,  color: "#d39a5f", image: "assets/equipment/springboard.svg" },
+  mat:            { label: "Mat",         width: 200,  height: 120,  color: "#8ec2a2", image: "assets/equipment/mat.svg" },
 };
 
 window.objectCatalog = { ...DEFAULT_OBJECT_CATALOG };
+
+// Backward-compatibility aliases for older saves that used uppercase type ids.
+const LEGACY_OBJECT_TYPE_ALIASES = {
+  Bars: "bars",
+  Beam: "beam",
+  Floor: "floor",
+  Vault: "vault",
+};
+
+Object.entries(LEGACY_OBJECT_TYPE_ALIASES).forEach(([legacyKey, canonicalKey]) => {
+  if (!window.objectCatalog[legacyKey] && window.objectCatalog[canonicalKey]) {
+    window.objectCatalog[legacyKey] = window.objectCatalog[canonicalKey];
+  }
+});
 
 function slugifyEquipmentName(name) {
   return String(name)

@@ -882,6 +882,50 @@ function updateCurrentCustomMap(changes) {
   return true;
 }
 
+function applyCurrentMapScaleCalibration(factor) {
+  const scale = Number(factor);
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return null;
+  }
+  if (backgroundSelect.value !== CUSTOM_BACKGROUND_KEY || !customBackgroundConfig) {
+    setHint(t("hint.calibrationSelectCustomMap"));
+    return null;
+  }
+
+  const nextWidth = Math.max(1, Math.round(Number(customBackgroundConfig.width) * scale));
+  const nextHeight = Math.max(1, Math.round(Number(customBackgroundConfig.height) * scale));
+  const mapMeta = customBackgroundConfig.mapMeta || null;
+
+  if (customBackgroundConfig.sourceType === "image") {
+    registerCustomImageMap(
+      nextWidth,
+      nextHeight,
+      customBackgroundConfig.name,
+      customBackgroundConfig.imageSource || customBackgroundConfig.imageDataUrl,
+      mapMeta,
+    );
+  } else {
+    registerCustomMap(
+      nextWidth,
+      nextHeight,
+      customBackgroundConfig.textureName || LEGACY_COLOR_TO_TEXTURE[customBackgroundConfig.colorName] || "indoorGym",
+      customBackgroundConfig.name,
+      mapMeta,
+    );
+  }
+
+  backgroundSelect.value = CUSTOM_BACKGROUND_KEY;
+  applyBackground(backgroundSelect.value);
+  clampBackgroundPan();
+  renderBackgroundView();
+
+  return {
+    factor: scale,
+    width: nextWidth,
+    height: nextHeight,
+  };
+}
+
 function promptForNewMap() {
   if (!newMapDialog || !newMapForm) {
     setHint(t("hint.newMapDialogUnavailable"));
@@ -1165,16 +1209,23 @@ function setGoogleImportLinkReadyState(isReady) {
 
 function computeImportDimensionsCm(latitude, zoom) {
   const mpp = metersPerPixelAtLatitude(latitude, zoom);
-  let widthCm = GOOGLE_STATIC_MAP_SIZE * mpp * 100;
-  let heightCm = GOOGLE_STATIC_MAP_SIZE * mpp * 100;
-
+  const sourceW = Number(googleImportState.selectedImageWidth) || 0;
+  const sourceH = Number(googleImportState.selectedImageHeight) || 0;
   const cropRect = googleImportState.cropRect;
-  const sourceW = googleImportState.selectedImageWidth;
-  const sourceH = googleImportState.selectedImageHeight;
-  if (cropRect && sourceW > 0 && sourceH > 0) {
-    widthCm *= cropRect.width / sourceW;
-    heightCm *= cropRect.height / sourceH;
-  }
+  const previewW = Number(googleMapPreviewMap?.clientWidth) || 0;
+  const previewH = Number(googleMapPreviewMap?.clientHeight) || 0;
+
+  // Use the actual imported image pixel size when available so non-square captures
+  // produce non-square real-world dimensions. Before an image is loaded, use
+  // the preview viewport size (which may be rectangular), then fall back to
+  // the legacy static-map reference size only when viewport size is unavailable.
+  const basePxWidth = sourceW > 0 ? sourceW : (previewW > 0 ? previewW : GOOGLE_STATIC_MAP_SIZE);
+  const basePxHeight = sourceH > 0 ? sourceH : (previewH > 0 ? previewH : GOOGLE_STATIC_MAP_SIZE);
+  const effectivePxWidth = cropRect ? Number(cropRect.width) || basePxWidth : basePxWidth;
+  const effectivePxHeight = cropRect ? Number(cropRect.height) || basePxHeight : basePxHeight;
+
+  const widthCm = effectivePxWidth * mpp * 100;
+  const heightCm = effectivePxHeight * mpp * 100;
 
   return {
     widthCm: Math.max(1, Math.round(widthCm)),
@@ -1790,6 +1841,7 @@ function loadImageElement(source) {
 
 window.registerCustomImageMap = registerCustomImageMap;
 window.promptForGoogleMapImport = promptForGoogleMapImport;
+window.applyCurrentMapScaleCalibration = applyCurrentMapScaleCalibration;
 
 function sizeBackgroundImg() {
   const dims = backgroundDimensions[backgroundSelect.value];
